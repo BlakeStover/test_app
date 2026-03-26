@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import NewTicket from './pages/NewTicket';
 import Dispatcher from './pages/Dispatcher';
+import Admin from './pages/Admin';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/new-ticket" element={<NewTicket />} />
         <Route path="/dispatcher" element={<Dispatcher />} />
+        <Route path="/admin" element={<Admin />} />
       </Routes>
     </BrowserRouter>
   );
