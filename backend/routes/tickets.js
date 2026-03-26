@@ -40,6 +40,7 @@ router.post('/', verifyToken, async (req, res) => {
       'INSERT INTO tickets (title, description, category, priority, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [title, description, category, priority || 'normal', created_by]
     );
+    req.io.emit('ticket_created', newTicket.rows[0]);
     res.status(201).json(newTicket.rows[0]);
   } catch (err) {
     console.error(err);
@@ -58,6 +59,7 @@ router.put('/:id', verifyDispatcher, async (req, res) => {
     if (updatedTicket.rows.length === 0) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
+    req.io.emit('ticket_updated', updatedTicket.rows[0]);
     res.json(updatedTicket.rows[0]);
   } catch (err) {
     console.error(err);

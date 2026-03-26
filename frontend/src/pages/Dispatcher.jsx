@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 
 function Dispatcher() {
   const [tickets, setTickets] = useState([]);
@@ -31,6 +32,22 @@ function Dispatcher() {
       }
     };
     getTickets();
+
+    const socket = io('http://localhost:5000');
+
+    socket.on('ticket_created', (newTicket) => {
+      setTickets((prev) => [newTicket, ...prev]);
+    });
+
+    socket.on('ticket_updated', (updatedTicket) => {
+      setTickets((prev) =>
+        prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [token]);
 
   const handleStatusChange = async (ticketId, newStatus) => {
@@ -47,13 +64,6 @@ function Dispatcher() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      const getTickets = async () => {
-        const res = await axios.get('http://localhost:5000/api/tickets', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setTickets(res.data);
-      };
-      getTickets();
     } catch {
       setError('Failed to update ticket');
     }
