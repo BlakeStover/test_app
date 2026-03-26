@@ -13,9 +13,18 @@ function Login() {
         email,
         password,
       });
+
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
-      window.location.href = '/dashboard';
+
+      const role = res.data.user.role;
+      if (role === 'dispatcher') {
+        window.location.href = '/dispatcher';
+      } else if (role === 'admin') {
+        window.location.href = '/admin';
+      } else {
+        window.location.href = '/dashboard';
+      }
     } catch {
       setError('Invalid email or password');
     }
