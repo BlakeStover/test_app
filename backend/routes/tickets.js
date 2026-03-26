@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const { verifyToken, verifyDispatcher } = require('../middleware/auth');
 
-// Get all tickets
-router.get('/', async (req, res) => {
+// Get all tickets - any logged in user
+router.get('/', verifyToken, async (req, res) => {
   try {
     const tickets = await pool.query(
       'SELECT * FROM tickets ORDER BY created_at DESC'
@@ -15,8 +16,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single ticket
-router.get('/:id', async (req, res) => {
+// Get single ticket - any logged in user
+router.get('/:id', verifyToken, async (req, res) => {
   try {
     const ticket = await pool.query(
       'SELECT * FROM tickets WHERE id = $1', [req.params.id]
@@ -31,8 +32,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create a ticket
-router.post('/', async (req, res) => {
+// Create a ticket - any logged in user
+router.post('/', verifyToken, async (req, res) => {
   const { title, description, category, priority, created_by } = req.body;
   try {
     const newTicket = await pool.query(
@@ -46,8 +47,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update a ticket
-router.put('/:id', async (req, res) => {
+// Update a ticket - dispatchers and admins only
+router.put('/:id', verifyDispatcher, async (req, res) => {
   const { status, assigned_to, priority } = req.body;
   try {
     const updatedTicket = await pool.query(
