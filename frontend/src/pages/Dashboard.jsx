@@ -39,7 +39,13 @@ function Dashboard() {
 
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
-      <h3>Tickets</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3>Tickets</h3>
+        <button onClick={() => window.location.href = '/new-ticket'}>
+          + New Request
+        </button>
+      </div>
+
       {tickets.length === 0 ? (
         <p>No tickets yet.</p>
       ) : (
