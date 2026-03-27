@@ -34,20 +34,15 @@ function Dispatcher() {
     getTickets();
 
     const socket = io('http://localhost:5000');
-
     socket.on('ticket_created', (newTicket) => {
       setTickets((prev) => [newTicket, ...prev]);
     });
-
     socket.on('ticket_updated', (updatedTicket) => {
       setTickets((prev) =>
         prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
       );
     });
-
-    return () => {
-      socket.disconnect();
-    };
+    return () => socket.disconnect();
   }, [token]);
 
   const handleStatusChange = async (ticketId, newStatus) => {
@@ -60,9 +55,7 @@ function Dispatcher() {
           assigned_to: ticket.assigned_to,
           priority: ticket.priority,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch {
       setError('Failed to update ticket');
@@ -71,11 +64,21 @@ function Dispatcher() {
 
   const statusColor = (status) => {
     switch (status) {
-      case 'open': return '#fef3c7';
-      case 'in_progress': return '#dbeafe';
-      case 'resolved': return '#d1fae5';
-      case 'closed': return '#f3f4f6';
-      default: return '#fef3c7';
+      case 'open': return 'bg-yellow-100 text-yellow-800';
+      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'resolved': return 'bg-green-100 text-green-800';
+      case 'closed': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-yellow-100 text-yellow-800';
+    }
+  };
+
+  const priorityColor = (priority) => {
+    switch (priority) {
+      case 'urgent': return 'bg-red-100 text-red-800';
+      case 'high': return 'bg-orange-100 text-orange-800';
+      case 'normal': return 'bg-blue-100 text-blue-800';
+      case 'low': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-blue-100 text-blue-800';
     }
   };
 
@@ -86,62 +89,80 @@ function Dispatcher() {
   };
 
   return (
-    <div style={{ maxWidth: '900px', margin: '2rem auto', padding: '2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Dispatcher Dashboard</h2>
-        <div>
-          <span style={{ marginRight: '1rem' }}>Welcome, {user?.name}</span>
-          <button onClick={handleLogout}>Logout</button>
+    <div className="min-h-screen bg-gray-100">
+      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-gray-800">Campus Ticket System</h1>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
+          <button
+            onClick={handleLogout}
+            className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors"
+          >
+            Logout
+          </button>
         </div>
-      </div>
+      </nav>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">Dispatcher Dashboard</h2>
+          <span className="text-sm text-gray-500">{tickets.length} total tickets</span>
+        </div>
 
-      <h3>All Tickets ({tickets.length})</h3>
-
-      {tickets.length === 0 ? (
-        <p>No tickets yet.</p>
-      ) : (
-        tickets.map((ticket) => (
-          <div key={ticket.id} style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '1rem',
-            marginBottom: '1rem'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <h4 style={{ margin: '0 0 0.25rem 0' }}>#{ticket.id} — {ticket.title}</h4>
-                <p style={{ color: '#666', margin: '0.25rem 0' }}>{ticket.description}</p>
-                <small style={{ color: '#999' }}>
-                  Category: {ticket.category} · Priority: {ticket.priority} · Submitted: {new Date(ticket.created_at).toLocaleDateString()}
-                </small>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-                <span style={{
-                  background: statusColor(ticket.status),
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '999px',
-                  fontSize: '0.85rem',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {ticket.status}
-                </span>
-                <select
-                  value={ticket.status}
-                  onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
-                  style={{ padding: '0.25rem', fontSize: '0.85rem' }}
-                >
-                  <option value="open">Open</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </div>
-            </div>
+        {error && (
+          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
+            {error}
           </div>
-        ))
-      )}
+        )}
+
+        {tickets.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+            <p className="text-gray-400 text-lg">No tickets yet</p>
+            <p className="text-gray-400 text-sm mt-1">New requests will appear here in real time</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {tickets.map((ticket) => (
+              <div key={ticket.id} className="bg-white rounded-2xl shadow-sm p-6">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs text-gray-400">#{ticket.id}</span>
+                      <h3 className="font-semibold text-gray-800">{ticket.title}</h3>
+                    </div>
+                    <p className="text-gray-500 text-sm mb-3">{ticket.description}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <span>{ticket.category}</span>
+                      <span>·</span>
+                      <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 ml-4">
+                    <div className="flex gap-2">
+                      <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusColor(ticket.status)}`}>
+                        {ticket.status}
+                      </span>
+                      <span className={`text-xs font-medium px-3 py-1 rounded-full ${priorityColor(ticket.priority)}`}>
+                        {ticket.priority}
+                      </span>
+                    </div>
+                    <select
+                      value={ticket.status}
+                      onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
+                      className="text-sm border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="open">Open</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

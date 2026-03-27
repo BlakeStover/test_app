@@ -28,92 +28,106 @@ function NewTicket() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setSuccess('Ticket submitted successfully!');
+      setSuccess('Your request has been submitted successfully!');
       setTitle('');
       setDescription('');
       setCategory('maintenance');
       setPriority('normal');
     } catch {
-      setError('Failed to submit ticket. Please try again.');
+      setError('Failed to submit request. Please try again.');
     }
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '2rem auto', padding: '2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Submit a Request</h2>
-        <button onClick={() => window.location.href = '/dashboard'}>
+    <div className="min-h-screen bg-gray-100">
+      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-gray-800">Campus Ticket System</h1>
+        <button
+          onClick={() => window.location.href = '/dashboard'}
+          className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors"
+        >
           Back to Dashboard
         </button>
+      </nav>
+
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Submit a Request</h2>
+
+        {error && (
+          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg mb-4 text-sm">
+            {success}
+          </div>
+        )}
+
+        <div className="bg-white rounded-2xl shadow-sm p-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Brief description of the issue"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-32 resize-none"
+                placeholder="Provide more details about the issue and location"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="maintenance">Maintenance</option>
+                  <option value="campus_safety">Campus Safety</option>
+                  <option value="it">IT Support</option>
+                  <option value="cleaning">Cleaning</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
+            >
+              Submit Request
+            </button>
+          </form>
+        </div>
       </div>
-
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {success && <p style={{ color: 'green' }}>{success}</p>}
-
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label>Title</label>
-          <br />
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
-            placeholder="Brief description of the issue"
-            required
-          />
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label>Description</label>
-          <br />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem', height: '120px' }}
-            placeholder="Provide more details about the issue and location"
-            required
-          />
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label>Category</label>
-          <br />
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
-          >
-            <option value="maintenance">Maintenance</option>
-            <option value="campus_safety">Campus Safety</option>
-            <option value="it">IT Support</option>
-            <option value="cleaning">Cleaning</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label>Priority</label>
-          <br />
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
-          >
-            <option value="low">Low</option>
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
-
-        <button
-          type="submit"
-          style={{ width: '100%', padding: '0.75rem' }}
-        >
-          Submit Request
-        </button>
-      </form>
     </div>
   );
 }
