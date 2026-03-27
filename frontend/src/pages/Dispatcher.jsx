@@ -132,9 +132,11 @@ function Dispatcher() {
                     </div>
                     <p className="text-gray-500 text-sm mb-3">{ticket.description}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-400">
-                      <span>{ticket.category}</span>
-                      <span>·</span>
-                      <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                        <span>{ticket.category}</span>
+                        <span>·</span>
+                        <span>Submitted by: {ticket.submitted_by_name}</span>
+                        <span>·</span>
+                        <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 ml-4">

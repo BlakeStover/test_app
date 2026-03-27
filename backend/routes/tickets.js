@@ -4,11 +4,28 @@ const pool = require('../config/db');
 const { verifyToken, verifyDispatcher } = require('../middleware/auth');
 const { sendTicketNotification } = require('../utils/email');
 
-// Get all tickets - any logged in user
-router.get('/', verifyToken, async (req, res) => {
+// Get tickets for logged in student
+router.get('/my-tickets', verifyToken, async (req, res) => {
   try {
     const tickets = await pool.query(
-      'SELECT * FROM tickets ORDER BY created_at DESC'
+      'SELECT * FROM tickets WHERE created_by = $1 ORDER BY created_at DESC',
+      [req.user.id]
+    );
+    res.json(tickets.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get all tickets with user info - dispatchers and admins only
+router.get('/', verifyDispatcher, async (req, res) => {
+  try {
+    const tickets = await pool.query(
+      `SELECT tickets.*, users.name as submitted_by_name, users.email as submitted_by_email
+       FROM tickets
+       LEFT JOIN users ON tickets.created_by = users.id
+       ORDER BY tickets.created_at DESC`
     );
     res.json(tickets.rows);
   } catch (err) {
