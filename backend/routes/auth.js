@@ -72,4 +72,63 @@ router.post('/login', async (req, res) => {
   }
 });
 
+const crypto = require('crypto');
+
+// Request password reset
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await pool.query(
+      'SELECT * FROM users WHERE email = $1', [email]
+    );
+
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: 'No account with that email found' });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 3600000);
+
+    await pool.query(
+      'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3',
+      [token, expires, email]
+    );
+
+    const { sendPasswordResetEmail } = require('../utils/email');
+    await sendPasswordResetEmail(email, token);
+
+    res.json({ message: 'Password reset email sent' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Reset password
+router.post('/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  try {
+    const user = await pool.query(
+      'SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
+      [token]
+    );
+
+    if (user.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      'UPDATE users SET password = $1, reset_token = NULL, reset_token_expires = NULL WHERE reset_token = $2',
+      [hashedPassword, token]
+    );
+
+    res.json({ message: 'Password reset successful' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

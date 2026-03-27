@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import NewTicket from './pages/NewTicket';
 import Dispatcher from './pages/Dispatcher';
 import Admin from './pages/Admin';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 function App() {
   return (
@@ -17,6 +19,8 @@ function App() {
         <Route path="/new-ticket" element={<NewTicket />} />
         <Route path="/dispatcher" element={<Dispatcher />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   );
