@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const { verifyToken, verifyDispatcher } = require('../middleware/auth');
+const { sendTicketNotification } = require('../utils/email');
 
 // Get all tickets - any logged in user
 router.get('/', verifyToken, async (req, res) => {
@@ -41,6 +42,7 @@ router.post('/', verifyToken, async (req, res) => {
       [title, description, category, priority || 'normal', created_by]
     );
     req.io.emit('ticket_created', newTicket.rows[0]);
+    sendTicketNotification(newTicket.rows[0]);
     res.status(201).json(newTicket.rows[0]);
   } catch (err) {
     console.error(err);
