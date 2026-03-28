@@ -39,9 +39,10 @@ function Dispatcher() {
   useEffect(() => {
     const getTickets = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/tickets/my-tickets', {
+        const res = await axios.get('http://localhost:5000/api/tickets', {
           headers: { Authorization: `Bearer ${token}` },
         });
+        console.log('Tickets received:', res.data.length);
         setTickets(res.data);
       } catch {
         setError('Failed to load tickets');
