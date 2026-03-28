@@ -10,7 +10,7 @@ function Dashboard() {
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/tickets', {
+        const res = await axios.get('http://localhost:5000/api/tickets/my-tickets', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setTickets(res.data);

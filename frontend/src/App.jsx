@@ -7,6 +7,7 @@ import Dispatcher from './pages/Dispatcher';
 import Admin from './pages/Admin';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import TicketDetail from './pages/TicketDetail';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/admin" element={<Admin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/ticket" element={<TicketDetail />} />
       </Routes>
     </BrowserRouter>
   );
