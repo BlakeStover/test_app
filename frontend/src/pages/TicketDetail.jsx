@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 function TicketDetail() {
   const [ticket, setTicket] = useState(null);
   const [notes, setNotes] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [assignees, setAssignees] = useState([]);
   const [selectedAssignee, setSelectedAssignee] = useState('');
@@ -39,8 +40,19 @@ function TicketDetail() {
       }
     };
 
+    const getHistory = async () => {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/tickets/${ticketId}/history`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setHistory(res.data);
+      } catch {
+        // history is non-critical — silently ignore
+      }
+    };
+
     if (ticketId) {
-      Promise.all([getTicket(), getNotes()]).finally(() => setLoading(false));
+      Promise.all([getTicket(), getNotes(), getHistory()]).finally(() => setLoading(false));
     }
   }, [ticketId, token]);
 
@@ -108,6 +120,17 @@ function TicketDetail() {
     }
   };
 
+  const refreshHistory = async () => {
+    try {
+      const res = await axios.get(`http://localhost:5000/api/tickets/${ticketId}/history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setHistory(res.data);
+    } catch {
+      // non-critical
+    }
+  };
+
   const handleStatusChange = async (newStatus) => {
     try {
       const res = await axios.put(
@@ -116,6 +139,7 @@ function TicketDetail() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setTicket(res.data);
+      refreshHistory();
     } catch {
       setError('Failed to update ticket');
     }
@@ -133,6 +157,7 @@ function TicketDetail() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setTicket(res.data);
+      refreshHistory();
     } catch {
       setError('Failed to update assignment');
     }
@@ -164,6 +189,18 @@ function TicketDetail() {
       case 'dispatcher': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const fieldLabel = (field) => {
+    if (field === 'assigned_to') return 'assignment';
+    return field;
+  };
+
+  const formatHistoryValue = (field, value, assigneeName) => {
+    if (field === 'assigned_to') {
+      return value == null ? 'Unassigned' : (assigneeName || `User #${value}`);
+    }
+    return value ?? '—';
   };
 
   const backUrl = user?.role === 'dispatcher' || user?.role === 'admin'
@@ -369,6 +406,46 @@ function TicketDetail() {
               Add Note
             </button>
           </form>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">
+            History
+            {history.length > 0 && (
+              <span className="text-gray-400 font-normal text-sm ml-1">({history.length})</span>
+            )}
+          </h3>
+
+          {history.length === 0 ? (
+            <p className="text-gray-400 text-sm">No changes recorded yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {history.map((entry) => (
+                <div key={entry.id} className="flex items-start gap-4 text-sm border-l-2 border-gray-100 pl-4">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-gray-800">{entry.changed_by_name}</span>
+                    {' '}
+                    <span className="text-gray-500">changed</span>
+                    {' '}
+                    <span className="font-medium text-gray-700">{fieldLabel(entry.field)}</span>
+                    {' '}
+                    <span className="text-gray-500">from</span>
+                    {' '}
+                    <span className="text-gray-600 italic">
+                      {formatHistoryValue(entry.field, entry.old_value, entry.old_assignee_name)}
+                    </span>
+                    {' → '}
+                    <span className="font-medium text-gray-800">
+                      {formatHistoryValue(entry.field, entry.new_value, entry.new_assignee_name)}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap shrink-0 pt-0.5">
+                    {new Date(entry.changed_at).toLocaleDateString()} at {new Date(entry.changed_at).toLocaleTimeString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
