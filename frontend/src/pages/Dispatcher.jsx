@@ -11,6 +11,7 @@ function Dispatcher() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const { user, token, logout } = useAuth();
 
@@ -19,6 +20,17 @@ function Dispatcher() {
   const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 };
 
   const filtered = [...tickets]
+    .filter((t) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        String(t.id).includes(q) ||
+        t.title.toLowerCase().includes(q) ||
+        t.description?.toLowerCase().includes(q) ||
+        t.category.toLowerCase().includes(q) ||
+        t.submitted_by_name?.toLowerCase().includes(q)
+      );
+    })
     .filter((t) => filterStatus === 'all' || t.status === filterStatus)
     .filter((t) => filterPriority === 'all' || t.priority === filterPriority)
     .filter((t) => filterCategory === 'all' || t.category === filterCategory)
@@ -35,7 +47,7 @@ function Dispatcher() {
 
   useEffect(() => {
     setPage(1);
-  }, [filterStatus, filterPriority, filterCategory, sortBy]);
+  }, [filterStatus, filterPriority, filterCategory, sortBy, search]);
 
   useEffect(() => {
     const getTickets = async () => {
@@ -133,6 +145,14 @@ function Dispatcher() {
         )}
 
         <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 flex flex-wrap gap-3 items-center">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by #, title, description, category, submitter…"
+            className="text-sm border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-72"
+          />
+
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700">Sort</label>
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={selectClass}>
@@ -178,7 +198,7 @@ function Dispatcher() {
           </div>
 
           <button
-            onClick={() => { setSortBy('date_desc'); setFilterStatus('all'); setFilterPriority('all'); setFilterCategory('all'); setPage(1); }}
+            onClick={() => { setSearch(''); setSortBy('date_desc'); setFilterStatus('all'); setFilterPriority('all'); setFilterCategory('all'); setPage(1); }}
             className="text-sm text-gray-500 hover:text-gray-700 underline ml-auto"
           >
             Clear filters
