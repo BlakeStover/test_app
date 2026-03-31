@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { verifyToken, verifyDispatcher } = require('../middleware/auth');
 const { sendTicketNotification } = require('../utils/email');
+const { validateCreateTicket, validateUpdateTicket } = require('../middleware/validate');
 
 // Get tickets for logged in student
 router.get('/my-tickets', verifyToken, async (req, res) => {
@@ -51,7 +52,7 @@ router.get('/:id', verifyToken, async (req, res) => {
 });
 
 // Create a ticket - any logged in user
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, validateCreateTicket, async (req, res) => {
   const { title, description, category, priority, created_by } = req.body;
   try {
     const newTicket = await pool.query(
@@ -68,7 +69,7 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 // Update a ticket - dispatchers and admins only
-router.put('/:id', verifyDispatcher, async (req, res) => {
+router.put('/:id', verifyDispatcher, validateUpdateTicket, async (req, res) => {
   const { status, assigned_to, priority } = req.body;
   try {
     const updatedTicket = await pool.query(

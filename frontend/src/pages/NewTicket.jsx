@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 function NewTicket() {
   const [title, setTitle] = useState('');
@@ -8,25 +9,18 @@ function NewTicket() {
   const [priority, setPriority] = useState('normal');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
-  const user = JSON.parse(localStorage.getItem('user'));
-  const token = localStorage.getItem('token');
+  const [submitting, setSubmitting] = useState(false);
+  const { user, token } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSubmitting(true);
     try {
       await axios.post(
         'http://localhost:5000/api/tickets',
-        {
-          title,
-          description,
-          category,
-          priority,
-          created_by: user.id,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { title, description, category, priority, created_by: user.id },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       setSuccess('Your request has been submitted successfully!');
       setTitle('');
@@ -35,6 +29,8 @@ function NewTicket() {
       setPriority('normal');
     } catch {
       setError('Failed to submit request. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -121,9 +117,10 @@ function NewTicket() {
 
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
+              disabled={submitting}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium py-2 rounded-lg transition-colors"
             >
-              Submit Request
+              {submitting ? 'Submitting...' : 'Submit Request'}
             </button>
           </form>
         </div>

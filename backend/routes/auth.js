@@ -3,9 +3,10 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { validateRegister, validateLogin, validateForgotPassword, validateResetPassword } = require('../middleware/validate');
 
 // Register a new user
-router.post('/register', async (req, res) => {
+router.post('/register', validateRegister, async (req, res) => {
   const { name, email, password, role } = req.body;
 
   try {
@@ -32,7 +33,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Login
-router.post('/login', async (req, res) => {
+router.post('/login', validateLogin, async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -75,7 +76,7 @@ router.post('/login', async (req, res) => {
 const crypto = require('crypto');
 
 // Request password reset
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', validateForgotPassword, async (req, res) => {
   const { email } = req.body;
   try {
     const user = await pool.query(
@@ -105,7 +106,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // Reset password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', validateResetPassword, async (req, res) => {
   const { token, password } = req.body;
   try {
     const user = await pool.query(

@@ -1,24 +1,13 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 function Admin() {
   const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user'));
-
-  useEffect(() => {
-    if (!token) {
-      window.location.href = '/';
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      window.location.href = '/dashboard';
-    }
-  }, [user]);
+  const { user, token, logout } = useAuth();
 
   useEffect(() => {
     const getUsers = async () => {
@@ -29,6 +18,8 @@ function Admin() {
         setUsers(res.data);
       } catch {
         setError('Failed to load users');
+      } finally {
+        setLoading(false);
       }
     };
     getUsers();
@@ -42,9 +33,7 @@ function Admin() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSuccess('Role updated successfully');
-      setUsers(users.map((u) =>
-        u.id === userId ? { ...u, role: newRole } : u
-      ));
+      setUsers(users.map((u) => u.id === userId ? { ...u, role: newRole } : u));
       setTimeout(() => setSuccess(''), 3000);
     } catch {
       setError('Failed to update role');
@@ -66,8 +55,7 @@ function Admin() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    logout();
     window.location.href = '/';
   };
 
@@ -102,17 +90,17 @@ function Admin() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
-            {error}
-          </div>
+          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
         )}
         {success && (
-          <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg mb-4 text-sm">
-            {success}
-          </div>
+          <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg mb-4 text-sm">{success}</div>
         )}
 
-        {users.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          </div>
+        ) : users.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
             <p className="text-gray-400 text-lg">No users yet</p>
           </div>

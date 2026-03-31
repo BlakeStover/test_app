@@ -7,6 +7,7 @@ function Register() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -14,6 +15,7 @@ function Register() {
       setError('Passwords do not match');
       return;
     }
+    setSubmitting(true);
     try {
       await axios.post('http://localhost:5000/api/auth/register', {
         name,
@@ -24,6 +26,7 @@ function Register() {
       window.location.href = '/';
     } catch {
       setError('Registration failed. Email may already be in use.');
+      setSubmitting(false);
     }
   };
 
@@ -86,9 +89,10 @@ function Register() {
           </div>
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
+            disabled={submitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium py-2 rounded-lg transition-colors"
           >
-            Create Account
+            {submitting ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const { verifyToken } = require('../middleware/auth');
+const { validateNote } = require('../middleware/validate');
 
 // Get all notes for a ticket
 router.get('/:ticketId', verifyToken, async (req, res) => {
@@ -22,7 +23,7 @@ router.get('/:ticketId', verifyToken, async (req, res) => {
 });
 
 // Add a note to a ticket
-router.post('/:ticketId', verifyToken, async (req, res) => {
+router.post('/:ticketId', verifyToken, validateNote, async (req, res) => {
   const { content } = req.body;
   try {
     const newNote = await pool.query(
@@ -49,7 +50,7 @@ router.post('/:ticketId', verifyToken, async (req, res) => {
 
 
 // Edit a note
-router.put('/:noteId', verifyToken, async (req, res) => {
+router.put('/:noteId', verifyToken, validateNote, async (req, res) => {
   const { content } = req.body;
   try {
     const note = await pool.query(

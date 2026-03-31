@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 function Dashboard() {
   const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const user = JSON.parse(localStorage.getItem('user'));
-  const token = localStorage.getItem('token');
+  const { user, token, logout } = useAuth();
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -16,14 +17,15 @@ function Dashboard() {
         setTickets(res.data);
       } catch {
         setError('Failed to load tickets');
+      } finally {
+        setLoading(false);
       }
     };
     fetchTickets();
   }, [token]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    logout();
     window.location.href = '/';
   };
 
@@ -79,7 +81,11 @@ function Dashboard() {
           </div>
         )}
 
-        {tickets.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          </div>
+        ) : tickets.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
             <p className="text-gray-400 text-lg">No requests yet</p>
             <p className="text-gray-400 text-sm mt-1">Click the button above to submit your first request</p>

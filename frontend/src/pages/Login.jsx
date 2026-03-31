@@ -1,21 +1,25 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const { login } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError('');
+    setSubmitting(true);
     try {
       const res = await axios.post('http://localhost:5000/api/auth/login', {
         email,
         password,
       });
 
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+      login(res.data.user, res.data.token);
 
       const role = res.data.user.role;
       if (role === 'dispatcher') {
@@ -27,6 +31,7 @@ function Login() {
       }
     } catch {
       setError('Invalid email or password');
+      setSubmitting(false);
     }
   };
 
@@ -67,14 +72,15 @@ function Login() {
           </div>
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
+            disabled={submitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium py-2 rounded-lg transition-colors"
           >
-            Sign In
+            {submitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
         <p className="text-sm text-gray-500 text-center mt-2">
-            <a href="/forgot-password" className="text-blue-600 hover:underline">Forgot your password?</a>
+          <a href="/forgot-password" className="text-blue-600 hover:underline">Forgot your password?</a>
         </p>
 
         <p className="text-sm text-gray-500 text-center mt-4">

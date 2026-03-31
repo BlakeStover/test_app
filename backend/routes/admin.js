@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const { verifyAdmin } = require('../middleware/auth');
+const { validateRoleUpdate } = require('../middleware/validate');
 
 // Get all users
 router.get('/users', verifyAdmin, async (req, res) => {
@@ -17,7 +18,7 @@ router.get('/users', verifyAdmin, async (req, res) => {
 });
 
 // Update user role
-router.put('/users/:id', verifyAdmin, async (req, res) => {
+router.put('/users/:id', verifyAdmin, validateRoleUpdate, async (req, res) => {
   const { role } = req.body;
   try {
     const updatedUser = await pool.query(

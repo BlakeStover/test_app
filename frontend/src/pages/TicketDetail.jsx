@@ -1,21 +1,17 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 function TicketDetail() {
   const [ticket, setTicket] = useState(null);
   const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [newNote, setNewNote] = useState('');
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingContent, setEditingContent] = useState('');
   const [error, setError] = useState('');
-
-  const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user'));
+  const { user, token } = useAuth();
   const ticketId = new URLSearchParams(window.location.search).get('id');
-
-  useEffect(() => {
-    if (!token) window.location.href = '/';
-  }, [token]);
 
   useEffect(() => {
     const getTicket = async () => {
@@ -41,8 +37,7 @@ function TicketDetail() {
     };
 
     if (ticketId) {
-      getTicket();
-      getNotes();
+      Promise.all([getTicket(), getNotes()]).finally(() => setLoading(false));
     }
   }, [ticketId, token]);
 
@@ -103,11 +98,7 @@ function TicketDetail() {
     try {
       const res = await axios.put(
         `http://localhost:5000/api/tickets/${ticketId}`,
-        {
-          status: newStatus,
-          assigned_to: ticket.assigned_to,
-          priority: ticket.priority,
-        },
+        { status: newStatus, assigned_to: ticket.assigned_to, priority: ticket.priority },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setTicket(res.data);
@@ -148,10 +139,10 @@ function TicketDetail() {
     ? '/dispatcher'
     : '/dashboard';
 
-  if (!ticket) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-400">Loading ticket...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
       </div>
     );
   }
@@ -246,12 +237,12 @@ function TicketDetail() {
                       {note.author_role}
                     </span>
                     <span className="text-xs text-gray-400 ml-auto">
-                        {new Date(note.created_at).toLocaleDateString()} at {new Date(note.created_at).toLocaleTimeString()}
-                        {note.edited_at && (
-                            <span className="ml-2 italic text-gray-400">
-                                (edited {new Date(note.edited_at).toLocaleDateString()} at {new Date(note.edited_at).toLocaleTimeString()})
-                            </span>
-                        )}
+                      {new Date(note.created_at).toLocaleDateString()} at {new Date(note.created_at).toLocaleTimeString()}
+                      {note.edited_at && (
+                        <span className="ml-2 italic text-gray-400">
+                          (edited {new Date(note.edited_at).toLocaleDateString()} at {new Date(note.edited_at).toLocaleTimeString()})
+                        </span>
+                      )}
                     </span>
                   </div>
 

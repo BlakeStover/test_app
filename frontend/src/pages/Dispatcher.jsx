@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import { useAuth } from '../context/AuthContext';
 
 function Dispatcher() {
   const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sortBy, setSortBy] = useState('date_desc');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
-  const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user'));
+  const { user, token, logout } = useAuth();
 
   const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 };
 
@@ -27,25 +28,16 @@ function Dispatcher() {
     });
 
   useEffect(() => {
-    if (!token) window.location.href = '/';
-  }, [token]);
-
-  useEffect(() => {
-    if (!user || (user.role !== 'dispatcher' && user.role !== 'admin')) {
-      window.location.href = '/dashboard';
-    }
-  }, [user]);
-
-  useEffect(() => {
     const getTickets = async () => {
       try {
         const res = await axios.get('http://localhost:5000/api/tickets', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        console.log('Tickets received:', res.data.length);
         setTickets(res.data);
       } catch {
         setError('Failed to load tickets');
+      } finally {
+        setLoading(false);
       }
     };
     getTickets();
@@ -67,11 +59,7 @@ function Dispatcher() {
       const ticket = tickets.find((t) => t.id === ticketId);
       await axios.put(
         `http://localhost:5000/api/tickets/${ticketId}`,
-        {
-          status: newStatus,
-          assigned_to: ticket.assigned_to,
-          priority: ticket.priority,
-        },
+        { status: newStatus, assigned_to: ticket.assigned_to, priority: ticket.priority },
         { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch {
@@ -100,8 +88,7 @@ function Dispatcher() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    logout();
     window.location.href = '/';
   };
 
@@ -185,7 +172,11 @@ function Dispatcher() {
           </button>
         </div>
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
             <p className="text-gray-400 text-lg">No tickets match your filters</p>
           </div>
