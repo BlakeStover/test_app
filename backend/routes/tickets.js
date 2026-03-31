@@ -23,12 +23,29 @@ router.get('/my-tickets', verifyToken, async (req, res) => {
 router.get('/', verifyDispatcher, async (req, res) => {
   try {
     const tickets = await pool.query(
-      `SELECT tickets.*, users.name as submitted_by_name, users.email as submitted_by_email
+      `SELECT tickets.*,
+              submitter.name as submitted_by_name,
+              submitter.email as submitted_by_email,
+              assignee.name as assigned_to_name
        FROM tickets
-       LEFT JOIN users ON tickets.created_by = users.id
+       LEFT JOIN users submitter ON tickets.created_by = submitter.id
+       LEFT JOIN users assignee ON tickets.assigned_to = assignee.id
        ORDER BY tickets.created_at DESC`
     );
     res.json(tickets.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get dispatchers and admins available for assignment
+router.get('/assignees', verifyDispatcher, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, name FROM users WHERE role IN ('dispatcher', 'admin') ORDER BY name ASC"
+    );
+    res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -39,7 +56,11 @@ router.get('/', verifyDispatcher, async (req, res) => {
 router.get('/:id', verifyToken, async (req, res) => {
   try {
     const ticket = await pool.query(
-      'SELECT * FROM tickets WHERE id = $1', [req.params.id]
+      `SELECT tickets.*, assignee.name as assigned_to_name
+       FROM tickets
+       LEFT JOIN users assignee ON tickets.assigned_to = assignee.id
+       WHERE tickets.id = $1`,
+      [req.params.id]
     );
     if (ticket.rows.length === 0) {
       return res.status(404).json({ message: 'Ticket not found' });

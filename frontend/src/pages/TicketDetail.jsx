@@ -6,6 +6,8 @@ function TicketDetail() {
   const [ticket, setTicket] = useState(null);
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [assignees, setAssignees] = useState([]);
+  const [selectedAssignee, setSelectedAssignee] = useState('');
   const [newNote, setNewNote] = useState('');
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingContent, setEditingContent] = useState('');
@@ -20,6 +22,7 @@ function TicketDetail() {
           headers: { Authorization: `Bearer ${token}` },
         });
         setTicket(res.data);
+        setSelectedAssignee(res.data.assigned_to != null ? String(res.data.assigned_to) : '');
       } catch {
         setError('Failed to load ticket');
       }
@@ -40,6 +43,17 @@ function TicketDetail() {
       Promise.all([getTicket(), getNotes()]).finally(() => setLoading(false));
     }
   }, [ticketId, token]);
+
+  useEffect(() => {
+    if (user?.role !== 'dispatcher' && user?.role !== 'admin') return;
+    axios
+      .get('http://localhost:5000/api/tickets/assignees', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => setAssignees(res.data))
+      .catch(() => {});
+  }, [token, user]);
+
 
   const handleAddNote = async (e) => {
     e.preventDefault();
@@ -104,6 +118,23 @@ function TicketDetail() {
       setTicket(res.data);
     } catch {
       setError('Failed to update ticket');
+    }
+  };
+
+  const handleAssignmentChange = async () => {
+    try {
+      const res = await axios.put(
+        `http://localhost:5000/api/tickets/${ticketId}`,
+        {
+          status: ticket.status,
+          priority: ticket.priority,
+          assigned_to: selectedAssignee ? Number(selectedAssignee) : null,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTicket(res.data);
+    } catch {
+      setError('Failed to update assignment');
     }
   };
 
@@ -199,21 +230,50 @@ function TicketDetail() {
               <p className="text-xs text-gray-400 mb-1">Last updated</p>
               <p className="text-sm text-gray-700 font-medium">{new Date(ticket.updated_at).toLocaleDateString()}</p>
             </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Assigned to</p>
+              <p className="text-sm text-gray-700 font-medium">
+                {ticket.assigned_to_name ?? <span className="text-gray-400 font-normal">Unassigned</span>}
+              </p>
+            </div>
           </div>
 
           {(user?.role === 'dispatcher' || user?.role === 'admin') && (
-            <div className="border-t border-gray-100 pt-4 mt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Update Status</h3>
-              <select
-                value={ticket.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="open">Open</option>
-                <option value="in_progress">In Progress</option>
-                <option value="resolved">Resolved</option>
-                <option value="closed">Closed</option>
-              </select>
+            <div className="border-t border-gray-100 pt-4 mt-4 flex flex-wrap gap-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Status</h3>
+                <select
+                  value={ticket.status}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="open">Open</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Assign To</h3>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedAssignee}
+                    onChange={(e) => setSelectedAssignee(e.target.value)}
+                    className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Unassigned</option>
+                    {assignees.map((a) => (
+                      <option key={a.id} value={String(a.id)}>{a.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleAssignmentChange}
+                    className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -189,6 +189,7 @@ function Dispatcher() {
                   <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-6 py-4">Ticket #</th>
                   <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-6 py-4">Summary</th>
                   <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-6 py-4">Opened By</th>
+                  <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-6 py-4">Assigned To</th>
                   <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-6 py-4">Created</th>
                   <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-6 py-4">Status</th>
                 </tr>
@@ -214,6 +215,12 @@ function Dispatcher() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-600">{ticket.submitted_by_name}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {ticket.assigned_to_name
+                        ? <span className="text-sm text-gray-700">{ticket.assigned_to_name}</span>
+                        : <span className="text-sm text-gray-400">—</span>
+                      }
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-500">{new Date(ticket.created_at).toLocaleDateString()}</span>
