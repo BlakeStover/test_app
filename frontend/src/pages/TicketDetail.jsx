@@ -9,6 +9,7 @@ function TicketDetail() {
   const [loading, setLoading] = useState(true);
   const [assignees, setAssignees] = useState([]);
   const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingContent, setEditingContent] = useState('');
@@ -408,42 +409,50 @@ function TicketDetail() {
           </form>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">
-            History
-            {history.length > 0 && (
-              <span className="text-gray-400 font-normal text-sm ml-1">({history.length})</span>
-            )}
-          </h3>
+        <div className="mt-8 border border-gray-100 rounded-2xl overflow-hidden">
+          <button
+            onClick={() => setHistoryOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition-colors"
+          >
+            <span className="text-sm font-medium text-gray-400">
+              Change history
+              {history.length > 0 && (
+                <span className="ml-1.5 text-gray-300">({history.length})</span>
+              )}
+            </span>
+            <span className={`text-gray-300 text-xs transition-transform duration-200 inline-block ${historyOpen ? 'rotate-180' : ''}`}>
+              ▼
+            </span>
+          </button>
 
-          {history.length === 0 ? (
-            <p className="text-gray-400 text-sm">No changes recorded yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {history.map((entry) => (
-                <div key={entry.id} className="flex items-start gap-4 text-sm border-l-2 border-gray-100 pl-4">
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium text-gray-800">{entry.changed_by_name}</span>
-                    {' '}
-                    <span className="text-gray-500">changed</span>
-                    {' '}
-                    <span className="font-medium text-gray-700">{fieldLabel(entry.field)}</span>
-                    {' '}
-                    <span className="text-gray-500">from</span>
-                    {' '}
-                    <span className="text-gray-600 italic">
-                      {formatHistoryValue(entry.field, entry.old_value, entry.old_assignee_name)}
-                    </span>
-                    {' → '}
-                    <span className="font-medium text-gray-800">
-                      {formatHistoryValue(entry.field, entry.new_value, entry.new_assignee_name)}
-                    </span>
-                  </div>
-                  <span className="text-xs text-gray-400 whitespace-nowrap shrink-0 pt-0.5">
-                    {new Date(entry.changed_at).toLocaleDateString()} at {new Date(entry.changed_at).toLocaleTimeString()}
-                  </span>
+          {historyOpen && (
+            <div className="px-6 pb-6 border-t border-gray-100">
+              {history.length === 0 ? (
+                <p className="text-xs text-gray-300 pt-4">No changes recorded yet.</p>
+              ) : (
+                <div className="space-y-3 pt-4">
+                  {history.map((entry) => (
+                    <div key={entry.id} className="flex items-start gap-4 text-xs border-l border-gray-100 pl-3">
+                      <div className="flex-1 min-w-0 text-gray-400">
+                        <span className="text-gray-500">{entry.changed_by_name}</span>
+                        {' changed '}
+                        <span className="text-gray-500">{fieldLabel(entry.field)}</span>
+                        {' from '}
+                        <span className="italic">
+                          {formatHistoryValue(entry.field, entry.old_value, entry.old_assignee_name)}
+                        </span>
+                        {' → '}
+                        <span className="text-gray-500">
+                          {formatHistoryValue(entry.field, entry.new_value, entry.new_assignee_name)}
+                        </span>
+                      </div>
+                      <span className="text-gray-300 whitespace-nowrap shrink-0 pt-0.5">
+                        {new Date(entry.changed_at).toLocaleDateString()} at {new Date(entry.changed_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
