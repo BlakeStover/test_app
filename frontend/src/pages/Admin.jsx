@@ -7,7 +7,12 @@ function Admin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [page, setPage] = useState(1);
   const { user, token, logout } = useAuth();
+
+  const PAGE_SIZE = 20;
+  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
+  const paginated = users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   useEffect(() => {
     const getUsers = async () => {
@@ -47,7 +52,10 @@ function Admin() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setSuccess('User deleted successfully');
-      setUsers(users.filter((u) => u.id !== userId));
+      const newUsers = users.filter((u) => u.id !== userId);
+      setUsers(newUsers);
+      const newTotalPages = Math.max(1, Math.ceil(newUsers.length / PAGE_SIZE));
+      if (page > newTotalPages) setPage(newTotalPages);
       setTimeout(() => setSuccess(''), 3000);
     } catch {
       setError('Failed to delete user');
@@ -86,7 +94,10 @@ function Admin() {
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">Admin Panel</h2>
-          <span className="text-sm text-gray-500">{users.length} total users</span>
+          <span className="text-sm text-gray-500">
+            {users.length} total users
+            {totalPages > 1 && ` · page ${page} of ${totalPages}`}
+          </span>
         </div>
 
         {error && (
@@ -106,7 +117,7 @@ function Admin() {
           </div>
         ) : (
           <div className="space-y-4">
-            {users.map((u) => (
+            {paginated.map((u) => (
               <div key={u.id} className="bg-white rounded-2xl shadow-sm p-6">
                 <div className="flex justify-between items-center">
                   <div>
@@ -139,6 +150,25 @@ function Admin() {
                 </div>
               </div>
             ))}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-6 py-4">
+                <button
+                  onClick={() => setPage((p) => p - 1)}
+                  disabled={page === 1}
+                  className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-500">Page {page} of {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page === totalPages}
+                  className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
