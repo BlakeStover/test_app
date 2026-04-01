@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/Navbar';
 
 function Dashboard() {
   const [tickets, setTickets] = useState([]);
@@ -60,29 +61,26 @@ function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">Campus Ticket System</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
-          <button
-            onClick={() => window.location.href = '/profile'}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            Profile
-          </button>
-          <button
-            onClick={handleLogout}
-            className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
+      <Navbar>
+        <span className="text-sm text-gray-600 dark:text-gray-300">Welcome, {user?.name}</span>
+        <button
+          onClick={() => window.location.href = '/profile'}
+          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+        >
+          Profile
+        </button>
+        <button
+          onClick={handleLogout}
+          className="text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg transition-colors"
+        >
+          Logout
+        </button>
+      </Navbar>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">My Requests</h2>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">My Requests</h2>
           <button
             onClick={() => window.location.href = '/new-ticket'}
             className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
@@ -92,21 +90,21 @@ function Dashboard() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
+          <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg mb-4 text-sm">
             {error}
           </div>
         )}
 
         {!loading && tickets.length > 0 && (
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             {statCards.map(({ label, value, status }) => (
               <button
                 key={status}
                 onClick={() => setFilterStatus(status === 'all' ? 'all' : filterStatus === status ? 'all' : status)}
-                className={`bg-white rounded-2xl shadow-sm p-4 text-left transition-all hover:shadow-md ${filterStatus === status && status !== 'all' ? 'ring-2 ring-blue-500' : ''}`}
+                className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 text-left transition-all hover:shadow-md ${filterStatus === status && status !== 'all' ? 'ring-2 ring-blue-500' : ''}`}
               >
-                <p className="text-2xl font-bold text-gray-800">{value}</p>
-                <p className="text-sm text-gray-500 mt-1">{label}</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white">{value}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{label}</p>
               </button>
             ))}
           </div>
@@ -117,36 +115,36 @@ function Dashboard() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
           </div>
         ) : tickets.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
-            <p className="text-gray-400 text-lg">No requests yet</p>
-            <p className="text-gray-400 text-sm mt-1">Click the button above to submit your first request</p>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-12 text-center">
+            <p className="text-gray-400 dark:text-gray-500 text-lg">No requests yet</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Click the button above to submit your first request</p>
           </div>
         ) : displayed.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
-            <p className="text-gray-400 text-lg">No {filterStatus.replace('_', ' ')} requests</p>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-12 text-center">
+            <p className="text-gray-400 dark:text-gray-500 text-lg">No {filterStatus.replace('_', ' ')} requests</p>
           </div>
         ) : (
           <div className="space-y-4">
             {displayed.map((ticket) => (
               <div
                 key={ticket.id}
-                className="bg-white rounded-2xl shadow-sm p-6 cursor-pointer hover:shadow-md transition-shadow"
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => window.location.href = `/ticket?id=${ticket.id}`}
               >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-gray-400">#{ticket.id}</span>
-                      <h3 className="font-semibold text-gray-800">{ticket.title}</h3>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">#{ticket.id}</span>
+                      <h3 className="font-semibold text-gray-800 dark:text-white truncate">{ticket.title}</h3>
                     </div>
-                    <p className="text-gray-500 text-sm mb-3">{ticket.description}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-3 line-clamp-2">{ticket.description}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
                       <span>{ticket.category}</span>
                       <span>·</span>
                       <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2 ml-4">
+                  <div className="flex flex-col items-end gap-2 shrink-0">
                     <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusColor(ticket.status)}`}>
                       {ticket.status}
                     </span>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/Navbar';
 
 function TicketDetail() {
   const [ticket, setTicket] = useState(null);
@@ -66,7 +67,6 @@ function TicketDetail() {
       .then((res) => setAssignees(res.data))
       .catch(() => {});
   }, [token, user]);
-
 
   const handleAddNote = async (e) => {
     e.preventDefault();
@@ -208,43 +208,45 @@ function TicketDetail() {
     ? '/dispatcher'
     : '/dashboard';
 
+  const inputClass = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white';
+  const selectClass = 'text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white';
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">Campus Ticket System</h1>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
+      <Navbar>
         <button
           onClick={() => window.location.href = backUrl}
-          className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors"
+          className="text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg transition-colors"
         >
           Back
         </button>
-      </nav>
+      </Navbar>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         {error && (
-          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
+          <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
+            <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs text-gray-400">#{ticket.id}</span>
-                <h2 className="text-xl font-bold text-gray-800">{ticket.title}</h2>
+                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">#{ticket.id}</span>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white">{ticket.title}</h2>
               </div>
-              <p className="text-gray-500 text-sm">
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
                 Submitted on {new Date(ticket.created_at).toLocaleDateString()} at {new Date(ticket.created_at).toLocaleTimeString()}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusColor(ticket.status)}`}>
                 {ticket.status}
               </span>
@@ -254,36 +256,36 @@ function TicketDetail() {
             </div>
           </div>
 
-          <div className="border-t border-gray-100 pt-4 mb-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Description</h3>
-            <p className="text-gray-600 text-sm">{ticket.description}</p>
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mb-4">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</h3>
+            <p className="text-gray-600 dark:text-gray-300 text-sm">{ticket.description}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 dark:border-gray-700 pt-4">
             <div>
-              <p className="text-xs text-gray-400 mb-1">Category</p>
-              <p className="text-sm text-gray-700 font-medium">{ticket.category}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Category</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200 font-medium">{ticket.category}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">Last updated</p>
-              <p className="text-sm text-gray-700 font-medium">{new Date(ticket.updated_at).toLocaleDateString()}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Last updated</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200 font-medium">{new Date(ticket.updated_at).toLocaleDateString()}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">Assigned to</p>
-              <p className="text-sm text-gray-700 font-medium">
-                {ticket.assigned_to_name ?? <span className="text-gray-400 font-normal">Unassigned</span>}
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Assigned to</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200 font-medium">
+                {ticket.assigned_to_name ?? <span className="text-gray-400 dark:text-gray-500 font-normal">Unassigned</span>}
               </p>
             </div>
           </div>
 
           {(user?.role === 'dispatcher' || user?.role === 'admin') && (
-            <div className="border-t border-gray-100 pt-4 mt-4 flex flex-wrap gap-6">
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mt-4 flex flex-wrap gap-6">
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Status</h3>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</h3>
                 <select
                   value={ticket.status}
                   onChange={(e) => handleStatusChange(e.target.value)}
-                  className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={selectClass}
                 >
                   <option value="open">Open</option>
                   <option value="in_progress">In Progress</option>
@@ -292,12 +294,12 @@ function TicketDetail() {
                 </select>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Assign To</h3>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Assign To</h3>
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedAssignee}
                     onChange={(e) => setSelectedAssignee(e.target.value)}
-                    className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={selectClass}
                   >
                     <option value="">Unassigned</option>
                     {assignees.map((a) => (
@@ -316,28 +318,28 @@ function TicketDetail() {
           )}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">
             Notes {notes.length > 0 && (
-              <span className="text-gray-400 font-normal text-sm ml-1">({notes.length})</span>
+              <span className="text-gray-400 dark:text-gray-500 font-normal text-sm ml-1">({notes.length})</span>
             )}
           </h3>
 
           {notes.length === 0 ? (
-            <p className="text-gray-400 text-sm mb-6">No notes yet — be the first to add one.</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm mb-6">No notes yet — be the first to add one.</p>
           ) : (
             <div className="space-y-4 mb-6">
               {notes.map((note) => (
-                <div key={note.id} className="border border-gray-100 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-medium text-gray-800">{note.author_name}</span>
+                <div key={note.id} className="border border-gray-100 dark:border-gray-700 rounded-xl p-4">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="text-sm font-medium text-gray-800 dark:text-white">{note.author_name}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${roleColor(note.author_role)}`}>
                       {note.author_role}
                     </span>
-                    <span className="text-xs text-gray-400 ml-auto">
+                    <span className="text-xs text-gray-400 dark:text-gray-500 sm:ml-auto">
                       {new Date(note.created_at).toLocaleDateString()} at {new Date(note.created_at).toLocaleTimeString()}
                       {note.edited_at && (
-                        <span className="ml-2 italic text-gray-400">
+                        <span className="ml-2 italic">
                           (edited {new Date(note.edited_at).toLocaleDateString()} at {new Date(note.edited_at).toLocaleTimeString()})
                         </span>
                       )}
@@ -349,7 +351,7 @@ function TicketDetail() {
                       <textarea
                         value={editingContent}
                         onChange={(e) => setEditingContent(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none mb-2"
+                        className={`${inputClass} h-24 resize-none mb-2`}
                       />
                       <div className="flex gap-2">
                         <button
@@ -360,7 +362,7 @@ function TicketDetail() {
                         </button>
                         <button
                           onClick={handleEditCancel}
-                          className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-lg transition-colors"
+                          className="text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-3 py-1 rounded-lg transition-colors"
                         >
                           Cancel
                         </button>
@@ -368,18 +370,18 @@ function TicketDetail() {
                     </div>
                   ) : (
                     <div>
-                      <p className="text-gray-600 text-sm mb-2">{note.content}</p>
+                      <p className="text-gray-600 dark:text-gray-300 text-sm mb-2">{note.content}</p>
                       {(note.user_id === user?.id || user?.role === 'admin') && (
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleEditStart(note)}
-                            className="text-xs text-blue-600 hover:underline"
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteNote(note.id)}
-                            className="text-xs text-red-600 hover:underline"
+                            className="text-xs text-red-600 dark:text-red-400 hover:underline"
                           >
                             Delete
                           </button>
@@ -392,12 +394,12 @@ function TicketDetail() {
             </div>
           )}
 
-          <form onSubmit={handleAddNote} className="border-t border-gray-100 pt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Add a note</h4>
+          <form onSubmit={handleAddNote} className="border-t border-gray-100 dark:border-gray-700 pt-4">
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add a note</h4>
             <textarea
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none mb-3"
+              className={`${inputClass} h-24 resize-none mb-3`}
               placeholder="Add a note, update, or comment..."
             />
             <button
@@ -409,44 +411,44 @@ function TicketDetail() {
           </form>
         </div>
 
-        <div className="mt-8 border border-gray-100 rounded-2xl overflow-hidden">
+        <div className="mt-8 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden">
           <button
             onClick={() => setHistoryOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
-            <span className="text-sm font-medium text-gray-400">
+            <span className="text-sm font-medium text-gray-400 dark:text-gray-500">
               Change history
               {history.length > 0 && (
-                <span className="ml-1.5 text-gray-300">({history.length})</span>
+                <span className="ml-1.5 text-gray-300 dark:text-gray-600">({history.length})</span>
               )}
             </span>
-            <span className={`text-gray-300 text-xs transition-transform duration-200 inline-block ${historyOpen ? 'rotate-180' : ''}`}>
+            <span className={`text-gray-300 dark:text-gray-600 text-xs transition-transform duration-200 inline-block ${historyOpen ? 'rotate-180' : ''}`}>
               ▼
             </span>
           </button>
 
           {historyOpen && (
-            <div className="px-6 pb-6 border-t border-gray-100">
+            <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-700">
               {history.length === 0 ? (
-                <p className="text-xs text-gray-300 pt-4">No changes recorded yet.</p>
+                <p className="text-xs text-gray-300 dark:text-gray-600 pt-4">No changes recorded yet.</p>
               ) : (
                 <div className="space-y-3 pt-4">
                   {history.map((entry) => (
-                    <div key={entry.id} className="flex items-start gap-4 text-xs border-l border-gray-100 pl-3">
-                      <div className="flex-1 min-w-0 text-gray-400">
-                        <span className="text-gray-500">{entry.changed_by_name}</span>
+                    <div key={entry.id} className="flex items-start gap-4 text-xs border-l border-gray-100 dark:border-gray-700 pl-3">
+                      <div className="flex-1 min-w-0 text-gray-400 dark:text-gray-500">
+                        <span className="text-gray-500 dark:text-gray-400">{entry.changed_by_name}</span>
                         {' changed '}
-                        <span className="text-gray-500">{fieldLabel(entry.field)}</span>
+                        <span className="text-gray-500 dark:text-gray-400">{fieldLabel(entry.field)}</span>
                         {' from '}
                         <span className="italic">
                           {formatHistoryValue(entry.field, entry.old_value, entry.old_assignee_name)}
                         </span>
                         {' → '}
-                        <span className="text-gray-500">
+                        <span className="text-gray-500 dark:text-gray-400">
                           {formatHistoryValue(entry.field, entry.new_value, entry.new_assignee_name)}
                         </span>
                       </div>
-                      <span className="text-gray-300 whitespace-nowrap shrink-0 pt-0.5">
+                      <span className="text-gray-300 dark:text-gray-600 whitespace-nowrap shrink-0 pt-0.5">
                         {new Date(entry.changed_at).toLocaleDateString()} at {new Date(entry.changed_at).toLocaleTimeString()}
                       </span>
                     </div>

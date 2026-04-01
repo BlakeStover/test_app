@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/Navbar';
 
 function Profile() {
   const { user, token, logout, updateUser } = useAuth();
@@ -70,45 +71,42 @@ function Profile() {
     }
   };
 
-  const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const inputClass = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white';
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">Campus Ticket System</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
-          <button
-            onClick={() => window.location.href = dashboardHref}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={handleLogout}
-            className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
+      <Navbar>
+        <span className="text-sm text-gray-600 dark:text-gray-300">Welcome, {user?.name}</span>
+        <button
+          onClick={() => window.location.href = dashboardHref}
+          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+        >
+          Dashboard
+        </button>
+        <button
+          onClick={handleLogout}
+          className="text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg transition-colors"
+        >
+          Logout
+        </button>
+      </Navbar>
 
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Profile</h2>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">Profile</h2>
 
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Profile Information</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Profile Information</h3>
           <form onSubmit={handleProfileUpdate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} />
             </div>
-            {profileError && <p className="text-red-600 text-sm">{profileError}</p>}
-            {profileSuccess && <p className="text-green-600 text-sm">{profileSuccess}</p>}
+            {profileError && <p className="text-red-600 dark:text-red-400 text-sm">{profileError}</p>}
+            {profileSuccess && <p className="text-green-600 dark:text-green-400 text-sm">{profileSuccess}</p>}
             <button
               type="submit"
               disabled={profileLoading}
@@ -119,23 +117,23 @@ function Profile() {
           </form>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Change Password</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Change Password</h3>
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
               <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputClass} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
               <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputClass} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
               <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass} />
             </div>
-            {passwordError && <p className="text-red-600 text-sm">{passwordError}</p>}
-            {passwordSuccess && <p className="text-green-600 text-sm">{passwordSuccess}</p>}
+            {passwordError && <p className="text-red-600 dark:text-red-400 text-sm">{passwordError}</p>}
+            {passwordSuccess && <p className="text-green-600 dark:text-green-400 text-sm">{passwordSuccess}</p>}
             <button
               type="submit"
               disabled={passwordLoading}

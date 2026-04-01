@@ -46,4 +46,39 @@ router.delete('/users/:id', verifyAdmin, async (req, res) => {
   }
 });
 
+// Reports data
+router.get('/reports', verifyAdmin, async (req, res) => {
+  try {
+    const [byCategory, byStatus, avgResolution, perDay] = await Promise.all([
+      pool.query(
+        'SELECT category, COUNT(*)::int AS count FROM tickets GROUP BY category ORDER BY count DESC'
+      ),
+      pool.query(
+        'SELECT status, COUNT(*)::int AS count FROM tickets GROUP BY status ORDER BY count DESC'
+      ),
+      pool.query(
+        `SELECT ROUND(AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600)::numeric, 1) AS avg_hours
+         FROM tickets WHERE status IN ('resolved', 'closed')`
+      ),
+      pool.query(
+        `SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') AS date, COUNT(*)::int AS count
+         FROM tickets
+         WHERE created_at >= NOW() - INTERVAL '30 days'
+         GROUP BY created_at::date
+         ORDER BY date ASC`
+      ),
+    ]);
+
+    res.json({
+      byCategory: byCategory.rows,
+      byStatus: byStatus.rows,
+      avgResolutionHours: avgResolution.rows[0]?.avg_hours ?? null,
+      perDay: perDay.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
