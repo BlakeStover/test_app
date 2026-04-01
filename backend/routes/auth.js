@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { validateRegister, validateLogin, validateForgotPassword, validateResetPassword } = require('../middleware/validate');
+const { verifyToken } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 
 const loginLimiter = rateLimit({
@@ -151,6 +152,66 @@ router.post('/reset-password', validateResetPassword, async (req, res) => {
     );
 
     res.json({ message: 'Password reset successful' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get current user's profile
+router.get('/profile', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, role FROM users WHERE id = $1', [req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update name and email
+router.put('/profile', verifyToken, async (req, res) => {
+  const { name, email } = req.body;
+  if (!name?.trim()) return res.status(400).json({ message: 'Name is required' });
+  if (!email?.trim()) return res.status(400).json({ message: 'Email is required' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ message: 'Invalid email format' });
+
+  try {
+    const existing = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND id != $2', [email, req.user.id]
+    );
+    if (existing.rows.length > 0) return res.status(400).json({ message: 'Email already in use' });
+
+    const result = await pool.query(
+      'UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING id, name, email, role',
+      [name.trim(), email.trim(), req.user.id]
+    );
+    res.json({ message: 'Profile updated', user: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Change password
+router.put('/profile/password', verifyToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword) return res.status(400).json({ message: 'Current password is required' });
+  if (!newPassword || newPassword.length < 8) return res.status(400).json({ message: 'New password must be at least 8 characters' });
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    const valid = await bcrypt.compare(currentPassword, result.rows[0].password);
+    if (!valid) return res.status(400).json({ message: 'Current password is incorrect' });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, req.user.id]);
+    res.json({ message: 'Password changed successfully' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

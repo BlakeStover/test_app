@@ -10,6 +10,7 @@ import Admin from './pages/Admin';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import TicketDetail from './pages/TicketDetail';
+import Profile from './pages/Profile';
 
 function App() {
   return (
@@ -44,6 +45,11 @@ function App() {
           <Route path="/ticket" element={
             <ProtectedRoute>
               <TicketDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           } />
         </Routes>

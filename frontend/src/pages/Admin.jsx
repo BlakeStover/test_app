@@ -83,6 +83,12 @@ function Admin() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
           <button
+            onClick={() => window.location.href = '/profile'}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Profile
+          </button>
+          <button
             onClick={handleLogout}
             className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors"
           >

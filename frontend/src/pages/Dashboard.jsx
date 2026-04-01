@@ -6,6 +6,7 @@ function Dashboard() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   const { user, token, logout } = useAuth();
 
   useEffect(() => {
@@ -23,6 +24,15 @@ function Dashboard() {
     };
     fetchTickets();
   }, [token]);
+
+  const displayed = filterStatus === 'all' ? tickets : tickets.filter((t) => t.status === filterStatus);
+
+  const statCards = [
+    { label: 'Total', value: tickets.length, status: 'all' },
+    { label: 'Open', value: tickets.filter((t) => t.status === 'open').length, status: 'open' },
+    { label: 'In Progress', value: tickets.filter((t) => t.status === 'in_progress').length, status: 'in_progress' },
+    { label: 'Resolved', value: tickets.filter((t) => t.status === 'resolved').length, status: 'resolved' },
+  ];
 
   const handleLogout = () => {
     logout();
@@ -56,6 +66,12 @@ function Dashboard() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
           <button
+            onClick={() => window.location.href = '/profile'}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Profile
+          </button>
+          <button
             onClick={handleLogout}
             className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors"
           >
@@ -81,6 +97,21 @@ function Dashboard() {
           </div>
         )}
 
+        {!loading && tickets.length > 0 && (
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            {statCards.map(({ label, value, status }) => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status === 'all' ? 'all' : filterStatus === status ? 'all' : status)}
+                className={`bg-white rounded-2xl shadow-sm p-4 text-left transition-all hover:shadow-md ${filterStatus === status && status !== 'all' ? 'ring-2 ring-blue-500' : ''}`}
+              >
+                <p className="text-2xl font-bold text-gray-800">{value}</p>
+                <p className="text-sm text-gray-500 mt-1">{label}</p>
+              </button>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -90,9 +121,13 @@ function Dashboard() {
             <p className="text-gray-400 text-lg">No requests yet</p>
             <p className="text-gray-400 text-sm mt-1">Click the button above to submit your first request</p>
           </div>
+        ) : displayed.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+            <p className="text-gray-400 text-lg">No {filterStatus.replace('_', ' ')} requests</p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {tickets.map((ticket) => (
+            {displayed.map((ticket) => (
               <div
                 key={ticket.id}
                 className="bg-white rounded-2xl shadow-sm p-6 cursor-pointer hover:shadow-md transition-shadow"

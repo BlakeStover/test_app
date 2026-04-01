@@ -11,6 +11,7 @@ function Dispatcher() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterUnassigned, setFilterUnassigned] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const { user, token, logout } = useAuth();
@@ -18,6 +19,14 @@ function Dispatcher() {
   const PAGE_SIZE = 20;
 
   const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 };
+
+  const dispatcherStatCards = [
+    { label: 'Total', value: tickets.length, key: 'total' },
+    { label: 'Open', value: tickets.filter((t) => t.status === 'open').length, key: 'open' },
+    { label: 'In Progress', value: tickets.filter((t) => t.status === 'in_progress').length, key: 'in_progress' },
+    { label: 'Resolved', value: tickets.filter((t) => t.status === 'resolved').length, key: 'resolved' },
+    { label: 'Unassigned', value: tickets.filter((t) => !t.assigned_to).length, key: 'unassigned' },
+  ];
 
   const filtered = [...tickets]
     .filter((t) => {
@@ -34,6 +43,7 @@ function Dispatcher() {
     .filter((t) => filterStatus === 'all' || t.status === filterStatus)
     .filter((t) => filterPriority === 'all' || t.priority === filterPriority)
     .filter((t) => filterCategory === 'all' || t.category === filterCategory)
+    .filter((t) => !filterUnassigned || !t.assigned_to)
     .sort((a, b) => {
       if (sortBy === 'date_desc') return new Date(b.created_at) - new Date(a.created_at);
       if (sortBy === 'date_asc') return new Date(a.created_at) - new Date(b.created_at);
@@ -47,7 +57,7 @@ function Dispatcher() {
 
   useEffect(() => {
     setPage(1);
-  }, [filterStatus, filterPriority, filterCategory, sortBy, search]);
+  }, [filterStatus, filterPriority, filterCategory, filterUnassigned, sortBy, search]);
 
   useEffect(() => {
     const getTickets = async () => {
@@ -123,6 +133,12 @@ function Dispatcher() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
           <button
+            onClick={() => window.location.href = '/profile'}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Profile
+          </button>
+          <button
             onClick={handleLogout}
             className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors"
           >
@@ -142,6 +158,35 @@ function Dispatcher() {
 
         {error && (
           <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
+        )}
+
+        {!loading && tickets.length > 0 && (
+          <div className="grid grid-cols-5 gap-4 mb-6">
+            {dispatcherStatCards.map(({ label, value, key }) => {
+              const isActive = key === 'unassigned' ? filterUnassigned : (filterStatus === key && key !== 'total');
+              return (
+                <button
+                  key={key}
+                  onClick={() => {
+                    if (key === 'total') {
+                      setFilterStatus('all');
+                      setFilterUnassigned(false);
+                    } else if (key === 'unassigned') {
+                      setFilterUnassigned(!filterUnassigned);
+                      setFilterStatus('all');
+                    } else {
+                      setFilterStatus(filterStatus === key ? 'all' : key);
+                      setFilterUnassigned(false);
+                    }
+                  }}
+                  className={`bg-white rounded-2xl shadow-sm p-4 text-left transition-all hover:shadow-md ${isActive ? 'ring-2 ring-blue-500' : ''}`}
+                >
+                  <p className="text-2xl font-bold text-gray-800">{value}</p>
+                  <p className="text-sm text-gray-500 mt-1">{label}</p>
+                </button>
+              );
+            })}
+          </div>
         )}
 
         <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 flex flex-wrap gap-3 items-center">
@@ -198,7 +243,7 @@ function Dispatcher() {
           </div>
 
           <button
-            onClick={() => { setSearch(''); setSortBy('date_desc'); setFilterStatus('all'); setFilterPriority('all'); setFilterCategory('all'); setPage(1); }}
+            onClick={() => { setSearch(''); setSortBy('date_desc'); setFilterStatus('all'); setFilterPriority('all'); setFilterCategory('all'); setFilterUnassigned(false); setPage(1); }}
             className="text-sm text-gray-500 hover:text-gray-700 underline ml-auto"
           >
             Clear filters
