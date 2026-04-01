@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const { verifyToken, verifyDispatcher } = require('../middleware/auth');
-const { sendTicketNotification } = require('../utils/email');
+const { sendTicketNotification, sendStatusUpdateEmail } = require('../utils/email');
 const { validateCreateTicket, validateUpdateTicket } = require('../middleware/validate');
 
 // Get tickets for logged in student
@@ -150,6 +150,17 @@ router.put('/:id', verifyDispatcher, validateUpdateTicket, async (req, res) => {
         'INSERT INTO ticket_history (ticket_id, changed_by, field, old_value, new_value) VALUES ($1, $2, $3, $4, $5)',
         [req.params.id, req.user.id, field, oldVal, newVal]
       );
+    }
+
+    // Email the submitter when status moves to in_progress, resolved, or closed
+    if (old.status !== status && ['in_progress', 'resolved', 'closed'].includes(status)) {
+      const submitter = await pool.query(
+        'SELECT id, name, email FROM users WHERE id = $1',
+        [old.created_by]
+      );
+      if (submitter.rows.length > 0) {
+        sendStatusUpdateEmail(submitter.rows[0], updatedTicket.rows[0], status);
+      }
     }
 
     req.io.emit('ticket_updated', updatedTicket.rows[0]);

@@ -57,4 +57,33 @@ const sendPasswordResetEmail = async (email, token) => {
   }
 };
 
-module.exports = { sendTicketNotification, sendPasswordResetEmail };
+const sendStatusUpdateEmail = async (submitter, ticket, newStatus) => {
+  const statusLabel = {
+    in_progress: 'In Progress',
+    resolved: 'Resolved',
+    closed: 'Closed',
+  };
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: submitter.email,
+    subject: `Your request has been updated: ${ticket.title}`,
+    html: `
+      <h2>Request Status Update</h2>
+      <p>Hi ${submitter.name},</p>
+      <p>Your request <strong>#${ticket.id} — ${ticket.title}</strong> has been updated.</p>
+      <p><strong>New status:</strong> ${statusLabel[newStatus] || newStatus}</p>
+      <br/>
+      <p>Log in to the Campus Ticket System to view the full details and any notes from the team.</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('Status update email sent');
+  } catch (err) {
+    console.error('Email error:', err);
+  }
+};
+
+module.exports = { sendTicketNotification, sendPasswordResetEmail, sendStatusUpdateEmail };

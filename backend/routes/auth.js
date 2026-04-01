@@ -4,9 +4,34 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { validateRegister, validateLogin, validateForgotPassword, validateResetPassword } = require('../middleware/validate');
+const rateLimit = require('express-rate-limit');
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: 'Too many login attempts, please try again in 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: { message: 'Too many accounts created from this IP, please try again in an hour' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { message: 'Too many password reset attempts, please try again in 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Register a new user
-router.post('/register', validateRegister, async (req, res) => {
+router.post('/register', registerLimiter, validateRegister, async (req, res) => {
   const { name, email, password, role } = req.body;
 
   try {
@@ -33,7 +58,7 @@ router.post('/register', validateRegister, async (req, res) => {
 });
 
 // Login
-router.post('/login', validateLogin, async (req, res) => {
+router.post('/login', loginLimiter, validateLogin, async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -76,7 +101,7 @@ router.post('/login', validateLogin, async (req, res) => {
 const crypto = require('crypto');
 
 // Request password reset
-router.post('/forgot-password', validateForgotPassword, async (req, res) => {
+router.post('/forgot-password', forgotPasswordLimiter, validateForgotPassword, async (req, res) => {
   const { email } = req.body;
   try {
     const user = await pool.query(

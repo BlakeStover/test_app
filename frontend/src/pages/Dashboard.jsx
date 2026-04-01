@@ -93,7 +93,11 @@ function Dashboard() {
         ) : (
           <div className="space-y-4">
             {tickets.map((ticket) => (
-              <div key={ticket.id} className="bg-white rounded-2xl shadow-sm p-6">
+              <div
+                key={ticket.id}
+                className="bg-white rounded-2xl shadow-sm p-6 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => window.location.href = `/ticket?id=${ticket.id}`}
+              >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
