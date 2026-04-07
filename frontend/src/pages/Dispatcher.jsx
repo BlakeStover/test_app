@@ -12,13 +12,21 @@ function Dispatcher() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
-  const [filterUnassigned, setFilterUnassigned] = useState(false);
+  const [filterAssignee, setFilterAssignee] = useState('all'); // 'all' | 'unassigned' | userId string
+  const [assignees, setAssignees] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [pendingBulkAction, setPendingBulkAction] = useState(null);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkStatusVal, setBulkStatusVal] = useState('');
+  const [bulkAssigneeVal, setBulkAssigneeVal] = useState('');
+
   const { user, token, logout } = useAuth();
-
   const PAGE_SIZE = 20;
-
   const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 };
 
   const dispatcherStatCards = [
@@ -44,12 +52,18 @@ function Dispatcher() {
     .filter((t) => filterStatus === 'all' || t.status === filterStatus)
     .filter((t) => filterPriority === 'all' || t.priority === filterPriority)
     .filter((t) => filterCategory === 'all' || t.category === filterCategory)
-    .filter((t) => !filterUnassigned || !t.assigned_to)
+    .filter((t) => {
+      if (filterAssignee === 'all') return true;
+      if (filterAssignee === 'unassigned') return !t.assigned_to;
+      return String(t.assigned_to) === filterAssignee;
+    })
     .sort((a, b) => {
       if (sortBy === 'date_desc') return new Date(b.created_at) - new Date(a.created_at);
       if (sortBy === 'date_asc') return new Date(a.created_at) - new Date(b.created_at);
       if (sortBy === 'priority_desc') return priorityOrder[b.priority] - priorityOrder[a.priority];
       if (sortBy === 'priority_asc') return priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (sortBy === 'id_desc') return b.id - a.id;
+      if (sortBy === 'id_asc') return a.id - b.id;
       return 0;
     });
 
@@ -58,32 +72,31 @@ function Dispatcher() {
 
   useEffect(() => {
     setPage(1);
-  }, [filterStatus, filterPriority, filterCategory, filterUnassigned, sortBy, search]);
+    setSelectedIds(new Set());
+  }, [filterStatus, filterPriority, filterCategory, filterAssignee, sortBy, search]);
 
   useEffect(() => {
-    const getTickets = async () => {
+    const load = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/tickets', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setTickets(res.data);
+        const [ticketsRes, assigneesRes] = await Promise.all([
+          axios.get('http://localhost:5000/api/tickets', { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get('http://localhost:5000/api/tickets/assignees', { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+        setTickets(ticketsRes.data);
+        setAssignees(assigneesRes.data);
       } catch {
         setError('Failed to load tickets');
       } finally {
         setLoading(false);
       }
     };
-    getTickets();
+    load();
 
     const socket = io('http://localhost:5000');
-    socket.on('ticket_created', (newTicket) => {
-      setTickets((prev) => [newTicket, ...prev]);
-    });
-    socket.on('ticket_updated', (updatedTicket) => {
-      setTickets((prev) =>
-        prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
-      );
-    });
+    socket.on('ticket_created', (newTicket) => setTickets((prev) => [newTicket, ...prev]));
+    socket.on('ticket_updated', (updatedTicket) =>
+      setTickets((prev) => prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t)))
+    );
     return () => socket.disconnect();
   }, [token]);
 
@@ -97,6 +110,69 @@ function Dispatcher() {
       );
     } catch {
       setError('Failed to update ticket');
+    }
+  };
+
+  // Column sort
+  const handleColumnSort = (field) =>
+    setSortBy((prev) => (prev === `${field}_desc` ? `${field}_asc` : `${field}_desc`));
+
+  const sortIndicator = (field) => {
+    if (sortBy === `${field}_desc`) return <span className="ml-1 text-blue-500 text-xs">▼</span>;
+    if (sortBy === `${field}_asc`) return <span className="ml-1 text-blue-500 text-xs">▲</span>;
+    return <span className="ml-1 text-gray-300 dark:text-gray-600 text-xs">⇅</span>;
+  };
+
+  const thSort = 'text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider px-6 py-4 cursor-pointer select-none hover:text-gray-600 dark:hover:text-gray-300 transition-colors';
+  const thPlain = 'text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider px-6 py-4';
+
+  // Bulk selection helpers
+  const allPageSelected = paginated.length > 0 && paginated.every((t) => selectedIds.has(t.id));
+  const somePageSelected = paginated.some((t) => selectedIds.has(t.id)) && !allPageSelected;
+
+  const handleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) paginated.forEach((t) => next.delete(t.id));
+      else paginated.forEach((t) => next.add(t.id));
+      return next;
+    });
+  };
+
+  const handleSelectOne = (id, e) => {
+    e.stopPropagation();
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const openBulkModal = (type, value, label) => {
+    setPendingBulkAction({ type, value, label });
+    setShowBulkModal(true);
+  };
+
+  const handleBulkSubmit = async () => {
+    setBulkSubmitting(true);
+    try {
+      const body = { ids: [...selectedIds] };
+      if (pendingBulkAction.type === 'status') body.status = pendingBulkAction.value;
+      if (pendingBulkAction.type === 'assign') body.assigned_to = pendingBulkAction.value;
+      await axios.put('http://localhost:5000/api/tickets/bulk', body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSelectedIds(new Set());
+      setShowBulkModal(false);
+      setPendingBulkAction(null);
+      setBulkStatusVal('');
+      setBulkAssigneeVal('');
+    } catch {
+      setError('Failed to apply bulk update');
+      setShowBulkModal(false);
+    } finally {
+      setBulkSubmitting(false);
     }
   };
 
@@ -133,7 +209,7 @@ function Dispatcher() {
     setFilterStatus('all');
     setFilterPriority('all');
     setFilterCategory('all');
-    setFilterUnassigned(false);
+    setFilterAssignee('all');
     setPage(1);
   };
 
@@ -183,6 +259,36 @@ function Dispatcher() {
         </button>
       </Navbar>
 
+      {/* Bulk confirmation modal */}
+      {showBulkModal && pendingBulkAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Confirm bulk update</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
+              Apply <span className="font-medium">{pendingBulkAction.label}</span> to{' '}
+              <span className="font-medium">{selectedIds.size} ticket{selectedIds.size !== 1 ? 's' : ''}</span>?
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">This action will be logged in each ticket's history.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowBulkModal(false); setPendingBulkAction(null); }}
+                disabled={bulkSubmitting}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkSubmit}
+                disabled={bulkSubmitting}
+                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-40"
+              >
+                {bulkSubmitting ? 'Applying…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Dispatcher Dashboard</h2>
@@ -199,20 +305,23 @@ function Dispatcher() {
         {!loading && tickets.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
             {dispatcherStatCards.map(({ label, value, key }) => {
-              const isActive = key === 'unassigned' ? filterUnassigned : (filterStatus === key && key !== 'total');
+              const isActive =
+                key === 'unassigned'
+                  ? filterAssignee === 'unassigned'
+                  : filterStatus === key && key !== 'total';
               return (
                 <button
                   key={key}
                   onClick={() => {
                     if (key === 'total') {
                       setFilterStatus('all');
-                      setFilterUnassigned(false);
+                      setFilterAssignee('all');
                     } else if (key === 'unassigned') {
-                      setFilterUnassigned(!filterUnassigned);
+                      setFilterAssignee(filterAssignee === 'unassigned' ? 'all' : 'unassigned');
                       setFilterStatus('all');
                     } else {
                       setFilterStatus(filterStatus === key ? 'all' : key);
-                      setFilterUnassigned(false);
+                      setFilterAssignee('all');
                     }
                   }}
                   className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 text-left transition-all hover:shadow-md ${isActive ? 'ring-2 ring-blue-500' : ''}`}
@@ -226,7 +335,7 @@ function Dispatcher() {
         )}
 
         {/* Filter bar */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 mb-6 flex flex-wrap gap-3 items-center">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-center">
           <input
             type="text"
             value={search}
@@ -236,18 +345,8 @@ function Dispatcher() {
           />
 
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={selectClass}>
-              <option value="date_desc">Newest first</option>
-              <option value="date_asc">Oldest first</option>
-              <option value="priority_desc">Priority: high to low</option>
-              <option value="priority_asc">Priority: low to high</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass}>
+            <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setFilterAssignee('all'); }} className={selectClass}>
               <option value="all">All statuses</option>
               <option value="open">Open</option>
               <option value="in_progress">In progress</option>
@@ -279,6 +378,21 @@ function Dispatcher() {
             </select>
           </div>
 
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Assigned</label>
+            <select
+              value={filterAssignee}
+              onChange={(e) => { setFilterAssignee(e.target.value); setFilterStatus('all'); }}
+              className={selectClass}
+            >
+              <option value="all">Anyone</option>
+              <option value="unassigned">Unassigned</option>
+              {assignees.map((a) => (
+                <option key={a.id} value={String(a.id)}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={clearFilters}
             className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline ml-auto"
@@ -286,6 +400,73 @@ function Dispatcher() {
             Clear filters
           </button>
         </div>
+
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-2xl px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+              {selectedIds.size} selected
+            </span>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-blue-600 dark:text-blue-400 font-medium">Set status:</label>
+              <select
+                value={bulkStatusVal}
+                onChange={(e) => setBulkStatusVal(e.target.value)}
+                className="text-sm border border-blue-300 dark:border-blue-600 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+              >
+                <option value="">Choose…</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+              <button
+                onClick={() => bulkStatusVal && openBulkModal('status', bulkStatusVal, `status → ${bulkStatusVal.replace('_', ' ')}`)}
+                disabled={!bulkStatusVal}
+                className="text-sm px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Apply
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-blue-600 dark:text-blue-400 font-medium">Assign to:</label>
+              <select
+                value={bulkAssigneeVal}
+                onChange={(e) => setBulkAssigneeVal(e.target.value)}
+                className="text-sm border border-blue-300 dark:border-blue-600 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+              >
+                <option value="">Choose…</option>
+                <option value="null">Unassigned</option>
+                {assignees.map((a) => (
+                  <option key={a.id} value={String(a.id)}>{a.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  if (!bulkAssigneeVal) return;
+                  const val = bulkAssigneeVal === 'null' ? null : Number(bulkAssigneeVal);
+                  const label = bulkAssigneeVal === 'null'
+                    ? 'assign → Unassigned'
+                    : `assign → ${assignees.find((a) => String(a.id) === bulkAssigneeVal)?.name}`;
+                  openBulkModal('assign', val, label);
+                }}
+                disabled={!bulkAssigneeVal}
+                className="text-sm px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Apply
+              </button>
+            </div>
+
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-200 underline ml-auto"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-16">
@@ -302,15 +483,25 @@ function Dispatcher() {
               {paginated.map((ticket) => (
                 <div
                   key={ticket.id}
-                  onClick={() => window.location.href = `/ticket?id=${ticket.id}`}
-                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={(e) => {
+                    if (selectedIds.size > 0) handleSelectOne(ticket.id, e);
+                    else window.location.href = `/ticket?id=${ticket.id}`;
+                  }}
+                  className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow ${selectedIds.has(ticket.id) ? 'ring-2 ring-blue-500' : ''}`}
                 >
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-start gap-3 mb-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(ticket.id)}
+                      onChange={(e) => handleSelectOne(ticket.id, e)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
                       <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">#{ticket.id}</span>
                       <h3 className="font-semibold text-gray-800 dark:text-white text-sm mt-0.5 truncate">{ticket.title}</h3>
                     </div>
-                    <div onClick={(e) => e.stopPropagation()} className="ml-3 shrink-0">
+                    <div onClick={(e) => e.stopPropagation()} className="ml-1 shrink-0">
                       <select
                         value={ticket.status}
                         onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
@@ -324,11 +515,14 @@ function Dispatcher() {
                     </div>
                   </div>
                   {ticket.description && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{ticket.description}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2 ml-7">{ticket.description}</p>
                   )}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${priorityColor(ticket.priority)}`}>
+                  <div className="flex flex-wrap items-center gap-2 ml-7">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                       {ticket.category}
+                    </span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${priorityColor(ticket.priority)}`}>
+                      {ticket.priority}
                     </span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{ticket.submitted_by_name}</span>
                     {ticket.assigned_to_name && (
@@ -347,33 +541,56 @@ function Dispatcher() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100 dark:border-gray-700">
-                    <th className="text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider px-6 py-4">Type</th>
-                    <th className="text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider px-6 py-4">Ticket #</th>
-                    <th className="text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider px-6 py-4">Summary</th>
-                    <th className="text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider px-6 py-4">Opened By</th>
-                    <th className="text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider px-6 py-4">Assigned To</th>
-                    <th className="text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider px-6 py-4">Created</th>
-                    <th className="text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider px-6 py-4">Status</th>
+                    <th className="px-4 py-4 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        ref={(el) => { if (el) el.indeterminate = somePageSelected; }}
+                        onChange={handleSelectAll}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
+                    <th className={thSort} onClick={() => handleColumnSort('id')}>
+                      Ticket #{sortIndicator('id')}
+                    </th>
+                    <th className={thPlain}>Summary</th>
+                    <th className={thPlain}>Opened By</th>
+                    <th className={thPlain}>Assigned To</th>
+                    <th className={thSort} onClick={() => handleColumnSort('date')}>
+                      Created{sortIndicator('date')}
+                    </th>
+                    <th className={thSort} onClick={() => handleColumnSort('priority')}>
+                      Priority{sortIndicator('priority')}
+                    </th>
+                    <th className={thPlain}>Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                   {paginated.map((ticket) => (
                     <tr
                       key={ticket.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${selectedIds.has(ticket.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
                       onClick={() => window.location.href = `/ticket?id=${ticket.id}`}
                     >
-                      <td className="px-6 py-4">
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${priorityColor(ticket.priority)}`}>
-                          {ticket.category}
-                        </span>
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(ticket.id)}
+                          onChange={(e) => handleSelectOne(ticket.id, e)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">#{ticket.id}</span>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium text-gray-800 dark:text-white truncate max-w-xs">{ticket.title}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-xs">{ticket.description}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-gray-400 dark:text-gray-500 capitalize">{ticket.category.replace('_', ' ')}</span>
+                          {ticket.description && (
+                            <p className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-xs">{ticket.description}</p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-sm text-gray-600 dark:text-gray-300">{ticket.submitted_by_name}</span>
@@ -386,6 +603,11 @@ function Dispatcher() {
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-sm text-gray-500 dark:text-gray-400">{new Date(ticket.created_at).toLocaleDateString()}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${priorityColor(ticket.priority)}`}>
+                          {ticket.priority}
+                        </span>
                       </td>
                       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                         <select

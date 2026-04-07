@@ -8,6 +8,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const { user, token, logout } = useAuth();
 
   useEffect(() => {
@@ -26,7 +27,9 @@ function Dashboard() {
     fetchTickets();
   }, [token]);
 
-  const displayed = filterStatus === 'all' ? tickets : tickets.filter((t) => t.status === filterStatus);
+  const displayed = tickets
+    .filter((t) => filterStatus === 'all' || t.status === filterStatus)
+    .filter((t) => filterCategory === 'all' || t.category === filterCategory);
 
   const statCards = [
     { label: 'Total', value: tickets.length, status: 'all' },
@@ -59,6 +62,8 @@ function Dashboard() {
       default: return 'bg-blue-100 text-blue-800';
     }
   };
+
+  const hasActiveFilter = filterStatus !== 'all' || filterCategory !== 'all';
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
@@ -96,18 +101,60 @@ function Dashboard() {
         )}
 
         {!loading && tickets.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            {statCards.map(({ label, value, status }) => (
-              <button
-                key={status}
-                onClick={() => setFilterStatus(status === 'all' ? 'all' : filterStatus === status ? 'all' : status)}
-                className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 text-left transition-all hover:shadow-md ${filterStatus === status && status !== 'all' ? 'ring-2 ring-blue-500' : ''}`}
-              >
-                <p className="text-2xl font-bold text-gray-800 dark:text-white">{value}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{label}</p>
-              </button>
-            ))}
-          </div>
+          <>
+            {/* Stat cards — click to filter by status */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+              {statCards.map(({ label, value, status }) => (
+                <button
+                  key={status}
+                  onClick={() => setFilterStatus(filterStatus === status && status !== 'all' ? 'all' : status)}
+                  className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 text-left transition-all hover:shadow-md ${filterStatus === status && status !== 'all' ? 'ring-2 ring-blue-500' : ''}`}
+                >
+                  <p className="text-2xl font-bold text-gray-800 dark:text-white">{value}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{label}</p>
+                </button>
+              ))}
+            </div>
+
+            {/* Filter row */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm px-4 py-3 mb-6 flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Category</label>
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                >
+                  <option value="all">All categories</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="campus_safety">Campus Safety</option>
+                  <option value="it">IT Support</option>
+                  <option value="cleaning">Cleaning</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              {hasActiveFilter && (
+                <button
+                  onClick={() => { setFilterStatus('all'); setFilterCategory('all'); }}
+                  className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline ml-auto"
+                >
+                  Clear filters
+                </button>
+              )}
+
+              {!hasActiveFilter && (
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
+                  {displayed.length} of {tickets.length} requests
+                </span>
+              )}
+              {hasActiveFilter && (
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {displayed.length} of {tickets.length} requests
+                </span>
+              )}
+            </div>
+          </>
         )}
 
         {loading ? (
@@ -121,7 +168,13 @@ function Dashboard() {
           </div>
         ) : displayed.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-12 text-center">
-            <p className="text-gray-400 dark:text-gray-500 text-lg">No {filterStatus.replace('_', ' ')} requests</p>
+            <p className="text-gray-400 dark:text-gray-500 text-lg">No matching requests</p>
+            <button
+              onClick={() => { setFilterStatus('all'); setFilterCategory('all'); }}
+              className="text-sm text-blue-500 mt-2 underline"
+            >
+              Clear filters
+            </button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -139,14 +192,14 @@ function Dashboard() {
                     </div>
                     <p className="text-gray-500 dark:text-gray-400 text-sm mb-3 line-clamp-2">{ticket.description}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-                      <span>{ticket.category}</span>
+                      <span className="capitalize">{ticket.category.replace('_', ' ')}</span>
                       <span>·</span>
                       <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusColor(ticket.status)}`}>
-                      {ticket.status}
+                      {ticket.status.replace('_', ' ')}
                     </span>
                     <span className={`text-xs font-medium px-3 py-1 rounded-full ${priorityColor(ticket.priority)}`}>
                       {ticket.priority}

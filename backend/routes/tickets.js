@@ -114,6 +114,70 @@ router.get('/:id/history', verifyToken, async (req, res) => {
   }
 });
 
+// Bulk update tickets - dispatchers and admins only
+router.put('/bulk', verifyDispatcher, async (req, res) => {
+  const { ids, status, assigned_to } = req.body;
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ message: 'No ticket IDs provided' });
+  }
+  if (ids.length > 100) {
+    return res.status(400).json({ message: 'Cannot update more than 100 tickets at once' });
+  }
+
+  const VALID_STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ message: 'Invalid status' });
+  }
+  if (status === undefined && assigned_to === undefined) {
+    return res.status(400).json({ message: 'No update fields provided' });
+  }
+
+  try {
+    let updatedCount = 0;
+    for (const id of ids) {
+      const current = await pool.query('SELECT * FROM tickets WHERE id = $1', [id]);
+      if (current.rows.length === 0) continue;
+      const old = current.rows[0];
+
+      const newStatus = status !== undefined ? status : old.status;
+      const newAssigned = assigned_to !== undefined ? assigned_to : old.assigned_to;
+
+      const result = await pool.query(
+        'UPDATE tickets SET status = $1, assigned_to = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+        [newStatus, newAssigned, id]
+      );
+      const updatedTicket = result.rows[0];
+
+      const changes = [];
+      if (old.status !== newStatus) changes.push(['status', old.status, newStatus]);
+      const oldAssigned = old.assigned_to != null ? String(old.assigned_to) : null;
+      const newAssignedStr = newAssigned != null ? String(newAssigned) : null;
+      if (oldAssigned !== newAssignedStr) changes.push(['assigned_to', oldAssigned, newAssignedStr]);
+
+      for (const [field, oldVal, newVal] of changes) {
+        await pool.query(
+          'INSERT INTO ticket_history (ticket_id, changed_by, field, old_value, new_value) VALUES ($1, $2, $3, $4, $5)',
+          [id, req.user.id, field, oldVal, newVal]
+        );
+      }
+
+      if (old.status !== newStatus && ['in_progress', 'resolved', 'closed'].includes(newStatus)) {
+        pool.query('SELECT id, name, email FROM users WHERE id = $1', [old.created_by])
+          .then((sub) => { if (sub.rows.length > 0) sendStatusUpdateEmail(sub.rows[0], updatedTicket, newStatus); })
+          .catch(() => {});
+      }
+
+      req.io.emit('ticket_updated', updatedTicket);
+      updatedCount++;
+    }
+    res.json({ updated: updatedCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Update a ticket - dispatchers and admins only
 router.put('/:id', verifyDispatcher, validateUpdateTicket, async (req, res) => {
   const { status, assigned_to, priority } = req.body;
