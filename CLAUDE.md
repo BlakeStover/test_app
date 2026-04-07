@@ -165,3 +165,11 @@ PATCH  /api/users/profile         — update preferred_name, student_id, buildin
   - Login redirects students with profile_complete=false to /onboarding
   - /onboarding page: required full-screen mobile-first form, no skip, redirects to /dashboard on save
   - /settings page: same form pre-populated from AuthContext, accessible from student nav in Dashboard
+- Phase 2 student home screen rebuild complete:
+  - Dashboard.jsx replaced with mobile-first app-style layout (max-w-lg, no stats cards, no table)
+  - Greeting uses preferred_name from AuthContext, falls back to first name
+  - Full-width primary "Submit a request" button + ghost "Track my tickets" button (smooth-scrolls to recent)
+  - Recent section shows last 5 tickets: title, time-ago string, color-coded status pill
+  - Status pill colors: Open = blue, In Progress = amber, Resolved = green, Closed = gray
+  - timeAgo() helper formats relative time (just now / Xm / Xh / Xd / date)
+  - Removed: stats cards, filter bar, category dropdown, full ticket list

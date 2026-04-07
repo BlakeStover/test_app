@@ -1,15 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+const statusPill = (status) => {
+  switch (status) {
+    case 'open':        return { label: 'Open',        cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' };
+    case 'in_progress': return { label: 'In Progress',  cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' };
+    case 'resolved':    return { label: 'Resolved',     cls: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' };
+    case 'closed':      return { label: 'Closed',       cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' };
+    default:            return { label: status,         cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' };
+  }
+};
 
 function Dashboard() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterCategory, setFilterCategory] = useState('all');
   const { user, token, logout } = useAuth();
+  const recentRef = useRef(null);
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -27,43 +48,17 @@ function Dashboard() {
     fetchTickets();
   }, [token]);
 
-  const displayed = tickets
-    .filter((t) => filterStatus === 'all' || t.status === filterStatus)
-    .filter((t) => filterCategory === 'all' || t.category === filterCategory);
-
-  const statCards = [
-    { label: 'Total', value: tickets.length, status: 'all' },
-    { label: 'Open', value: tickets.filter((t) => t.status === 'open').length, status: 'open' },
-    { label: 'In Progress', value: tickets.filter((t) => t.status === 'in_progress').length, status: 'in_progress' },
-    { label: 'Resolved', value: tickets.filter((t) => t.status === 'resolved').length, status: 'resolved' },
-  ];
+  const recent = tickets.slice(0, 5);
+  const displayName = user?.preferred_name || user?.name?.split(' ')[0] || 'there';
 
   const handleLogout = () => {
     logout();
     window.location.href = '/';
   };
 
-  const statusColor = (status) => {
-    switch (status) {
-      case 'open': return 'bg-yellow-100 text-yellow-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'resolved': return 'bg-green-100 text-green-800';
-      case 'closed': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-yellow-100 text-yellow-800';
-    }
+  const scrollToRecent = () => {
+    recentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-
-  const priorityColor = (priority) => {
-    switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'normal': return 'bg-blue-100 text-blue-800';
-      case 'low': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-blue-100 text-blue-800';
-    }
-  };
-
-  const hasActiveFilter = filterStatus !== 'all' || filterCategory !== 'all';
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
@@ -89,133 +84,73 @@ function Dashboard() {
         </button>
       </Navbar>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">My Requests</h2>
-          <button
-            onClick={() => window.location.href = '/new-ticket'}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            + New Request
-          </button>
-        </div>
-
+      <div className="max-w-lg mx-auto px-4 py-8">
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg mb-4 text-sm">
             {error}
           </div>
         )}
 
-        {!loading && tickets.length > 0 && (
-          <>
-            {/* Stat cards — click to filter by status */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-              {statCards.map(({ label, value, status }) => (
-                <button
-                  key={status}
-                  onClick={() => setFilterStatus(filterStatus === status && status !== 'all' ? 'all' : status)}
-                  className={`bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 text-left transition-all hover:shadow-md ${filterStatus === status && status !== 'all' ? 'ring-2 ring-blue-500' : ''}`}
-                >
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white">{value}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{label}</p>
-                </button>
-              ))}
+        {/* Hero section */}
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm px-6 py-8 mb-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500 mb-1">Hi, {displayName} 👋</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">How can we help you today?</h1>
+
+          <button
+            onClick={() => window.location.href = '/new-ticket'}
+            className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-base px-6 py-4 rounded-2xl transition-colors shadow-sm mb-3"
+          >
+            Submit a request
+          </button>
+
+          <button
+            onClick={scrollToRecent}
+            className="w-full border border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 text-gray-600 dark:text-gray-300 font-medium text-base px-6 py-4 rounded-2xl transition-colors"
+          >
+            Track my tickets
+          </button>
+        </div>
+
+        {/* Recent tickets */}
+        <div ref={recentRef}>
+          <h2 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 px-1">
+            Recent
+          </h2>
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600" />
             </div>
-
-            {/* Filter row */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm px-4 py-3 mb-6 flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Category</label>
-                <select
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
-                >
-                  <option value="all">All categories</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="campus_safety">Campus Safety</option>
-                  <option value="it">IT Support</option>
-                  <option value="cleaning">Cleaning</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              {hasActiveFilter && (
-                <button
-                  onClick={() => { setFilterStatus('all'); setFilterCategory('all'); }}
-                  className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline ml-auto"
-                >
-                  Clear filters
-                </button>
-              )}
-
-              {!hasActiveFilter && (
-                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
-                  {displayed.length} of {tickets.length} requests
-                </span>
-              )}
-              {hasActiveFilter && (
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  {displayed.length} of {tickets.length} requests
-                </span>
-              )}
+          ) : tickets.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm px-6 py-10 text-center">
+              <p className="text-gray-400 dark:text-gray-500">No requests yet</p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
+                Tap <span className="font-medium">Submit a request</span> to get started
+              </p>
             </div>
-          </>
-        )}
-
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-          </div>
-        ) : tickets.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-12 text-center">
-            <p className="text-gray-400 dark:text-gray-500 text-lg">No requests yet</p>
-            <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Click the button above to submit your first request</p>
-          </div>
-        ) : displayed.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-12 text-center">
-            <p className="text-gray-400 dark:text-gray-500 text-lg">No matching requests</p>
-            <button
-              onClick={() => { setFilterStatus('all'); setFilterCategory('all'); }}
-              className="text-sm text-blue-500 mt-2 underline"
-            >
-              Clear filters
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {displayed.map((ticket) => (
-              <div
-                key={ticket.id}
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => window.location.href = `/ticket?id=${ticket.id}`}
-              >
-                <div className="flex justify-between items-start gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">#{ticket.id}</span>
-                      <h3 className="font-semibold text-gray-800 dark:text-white truncate">{ticket.title}</h3>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden">
+              {recent.map((ticket, i) => {
+                const pill = statusPill(ticket.status);
+                return (
+                  <button
+                    key={ticket.id}
+                    onClick={() => window.location.href = `/ticket?id=${ticket.id}`}
+                    className={`w-full text-left px-5 py-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${i > 0 ? 'border-t border-gray-100 dark:border-gray-700' : ''}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 dark:text-white truncate">{ticket.title}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{timeAgo(ticket.created_at)}</p>
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-3 line-clamp-2">{ticket.description}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-                      <span className="capitalize">{ticket.category.replace('_', ' ')}</span>
-                      <span>·</span>
-                      <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusColor(ticket.status)}`}>
-                      {ticket.status.replace('_', ' ')}
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${pill.cls}`}>
+                      {pill.label}
                     </span>
-                    <span className={`text-xs font-medium px-3 py-1 rounded-full ${priorityColor(ticket.priority)}`}>
-                      {ticket.priority}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
