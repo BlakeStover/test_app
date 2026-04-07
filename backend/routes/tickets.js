@@ -74,11 +74,11 @@ router.get('/:id', verifyToken, async (req, res) => {
 
 // Create a ticket - any logged in user
 router.post('/', verifyToken, validateCreateTicket, async (req, res) => {
-  const { title, description, category, priority, created_by } = req.body;
+  const { title, description, category, priority, photo_filename } = req.body;
   try {
     const newTicket = await pool.query(
-      'INSERT INTO tickets (title, description, category, priority, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [title, description, category, priority || 'normal', created_by]
+      'INSERT INTO tickets (title, description, category, priority, created_by, photo_filename) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [title, description, category, priority || 'normal', req.user.id, photo_filename || null]
     );
     req.io.emit('ticket_created', newTicket.rows[0]);
     sendTicketNotification(newTicket.rows[0]);
