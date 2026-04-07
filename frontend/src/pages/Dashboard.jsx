@@ -97,7 +97,7 @@ function Dashboard() {
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">How can we help you today?</h1>
 
           <button
-            onClick={() => window.location.href = '/new-ticket'}
+            onClick={() => window.location.href = '/submit'}
             className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-base px-6 py-4 rounded-2xl transition-colors shadow-sm mb-3"
           >
             Submit a request

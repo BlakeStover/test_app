@@ -14,6 +14,7 @@ backend/
     tickets.js        — full ticket CRUD + bulk update + history
     notes.js          — add/edit/delete notes on tickets
     admin.js          — user management (list, role change, delete)
+    uploads.js        — POST /api/uploads (multer, jpeg/png/webp, 5MB max); files saved to backend/uploads/
   middleware/
     auth.js           — verifyToken, verifyDispatcher, verifyAdmin
     validate.js       — input validation for all routes
@@ -34,7 +35,9 @@ frontend/src/
     NewTicket.jsx     — student: submit ticket
     Onboarding.jsx    — student: required profile setup on first login (preferred name, student ID, building, room, phone)
     Settings.jsx      — student: edit campus profile info (same fields as onboarding, pre-populated)
-    TicketWizard.jsx  — student: multi-step ticket submission wizard (/submit); Steps 1 (category) + emergency modal built; Steps 2–4 pending
+    TicketWizard.jsx  — student: multi-step ticket submission wizard (/submit); all 4 steps + emergency modal + success screen complete
+  constants/
+    wizardTemplates.js — hardcoded templates per category, category→DB enum map, label maps
     Dispatcher.jsx    — dispatcher/admin: all tickets, filters, sort, bulk actions
     TicketDetail.jsx  — any role: view ticket, notes, history timeline
     Admin.jsx         — admin: user management
@@ -186,3 +189,14 @@ PATCH  /api/users/profile         — update preferred_name, student_id, buildin
   - CAMPUS_SAFETY_PHONE is a configurable constant at the top of TicketWizard.jsx
   - "Call now" fires a background POST /api/tickets (category: campus_safety, priority: urgent, status: open, title: "Emergency call placed"); fire-and-forget, modal stays open
   - Note: DB enums have no 'emergency' category or 'critical' priority — campus_safety + urgent used as closest values
+- Phase 3 ticket submission wizard — Steps 11–14 complete:
+  - frontend/src/constants/wizardTemplates.js — hardcoded templates (4 per category), CATEGORY_DB_MAP, CATEGORY_DEFAULT_TITLE, CATEGORY_LABEL exports
+  - Step 2 (template picker): tappable rows with radio indicator, highlights selected template; "Or describe it yourself" textarea clears template selection; Next disabled until template or custom text is present
+  - Step 3 (location + photo): building dropdown (GET /api/buildings), pre-filled from profile; room number input, pre-filled from profile; optional notes textarea; "Take photo" (capture="environment") and "Upload image" buttons (hidden inputs via refs); thumbnail preview with remove button; "Skip — no photo needed" text link
+  - Step 4 (confirm): read-only summary of category, issue title, building, room, notes, photo; "Edit something" returns to Step 1 preserving all state; "Submit request" uploads photo first (POST /api/uploads), then POSTs ticket with location embedded in description + photo_filename
+  - Success screen: checkmark, ticket number, "Back to home" primary button, "Track this ticket" ghost button
+  - multer installed in backend; POST /api/uploads — saves to backend/uploads/, returns { filename }; jpeg/png/webp only, 5MB max
+  - Uploaded files served statically at GET /uploads/:filename
+  - tickets POST updated to accept and store photo_filename; requires DB migration: ALTER TABLE tickets ADD COLUMN IF NOT EXISTS photo_filename VARCHAR(255);
+  - Category → DB enum mapping: lockout/emergency → campus_safety, maintenance/electrical/plumbing → maintenance, pest → cleaning
+  - Dashboard "Submit a request" button now routes to /submit instead of /new-ticket
