@@ -70,6 +70,12 @@ function Dashboard() {
       <Navbar>
         <span className="text-sm text-gray-600 dark:text-gray-300">Welcome, {user?.name}</span>
         <button
+          onClick={() => window.location.href = '/settings'}
+          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+        >
+          Settings
+        </button>
+        <button
           onClick={() => window.location.href = '/profile'}
           className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
         >

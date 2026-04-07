@@ -90,7 +90,13 @@ router.post('/login', loginLimiter, validateLogin, async (req, res) => {
         id: user.rows[0].id,
         name: user.rows[0].name,
         email: user.rows[0].email,
-        role: user.rows[0].role
+        role: user.rows[0].role,
+        profile_complete: user.rows[0].profile_complete,
+        preferred_name: user.rows[0].preferred_name,
+        student_id: user.rows[0].student_id,
+        building: user.rows[0].building,
+        room_number: user.rows[0].room_number,
+        phone: user.rows[0].phone,
       }
     });
   } catch (err) {

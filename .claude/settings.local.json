@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(psql \"postgresql://postgres:admin123@localhost:5432/test_app\")",
+      "Bash(psql \"postgresql://postgres:admin123@localhost:5432/test_app\" -c \"\\\\d users\")"
     ]
   }
 }

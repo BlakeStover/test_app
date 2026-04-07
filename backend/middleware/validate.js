@@ -64,6 +64,21 @@ function validateRoleUpdate(req, res, next) {
   next();
 }
 
+function validateUpdateProfile(req, res, next) {
+  const { preferred_name, student_id, building, room_number, phone } = req.body;
+  if (!preferred_name?.trim()) return res.status(400).json({ message: 'Preferred name is required' });
+  if (preferred_name.trim().length > 100) return res.status(400).json({ message: 'Preferred name must be 100 characters or fewer' });
+  if (!student_id?.trim()) return res.status(400).json({ message: 'Student ID is required' });
+  if (student_id.trim().length > 50) return res.status(400).json({ message: 'Student ID must be 50 characters or fewer' });
+  if (!building?.trim()) return res.status(400).json({ message: 'Building is required' });
+  if (building.trim().length > 150) return res.status(400).json({ message: 'Building must be 150 characters or fewer' });
+  if (!room_number?.trim()) return res.status(400).json({ message: 'Room number is required' });
+  if (room_number.trim().length > 20) return res.status(400).json({ message: 'Room number must be 20 characters or fewer' });
+  if (!phone?.trim()) return res.status(400).json({ message: 'Phone number is required' });
+  if (!/^\+?[\d\s\-().]{7,20}$/.test(phone.trim())) return res.status(400).json({ message: 'Invalid phone number format' });
+  next();
+}
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -73,4 +88,5 @@ module.exports = {
   validateUpdateTicket,
   validateNote,
   validateRoleUpdate,
+  validateUpdateProfile,
 };

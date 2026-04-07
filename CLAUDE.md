@@ -32,6 +32,8 @@ frontend/src/
     Login.jsx / Register.jsx / ForgotPassword.jsx / ResetPassword.jsx
     Dashboard.jsx     — student: view own tickets, filter by status + category
     NewTicket.jsx     — student: submit ticket
+    Onboarding.jsx    — student: required profile setup on first login (preferred name, student ID, building, room, phone)
+    Settings.jsx      — student: edit campus profile info (same fields as onboarding, pre-populated)
     Dispatcher.jsx    — dispatcher/admin: all tickets, filters, sort, bulk actions
     TicketDetail.jsx  — any role: view ticket, notes, history timeline
     Admin.jsx         — admin: user management
@@ -40,7 +42,7 @@ frontend/src/
 ```
 
 ## User roles & route access
-- student — /dashboard, /new-ticket, /ticket, /profile
+- student — /dashboard, /new-ticket, /ticket, /profile, /onboarding, /settings
 - dispatcher — /dispatcher, /ticket, /profile
 - admin — all of the above + /admin, /admin/reports
 
@@ -64,7 +66,7 @@ EMAIL_PASS=gmail app password
 - Admin: admin@test.com / password123
 
 ## Database tables
-- **users** — id, name, email, password (hashed), role, reset_token, reset_token_expiry
+- **users** — id, name, email, password (hashed), role, reset_token, reset_token_expiry, profile_complete (bool default false), preferred_name, student_id, building, room_number, phone
 - **tickets** — id, title, description, category, priority, status, created_by (FK users), assigned_to (FK users), created_at, updated_at
 - **notes** — id, ticket_id, user_id, content, created_at, updated_at
 - **ticket_history** — id, ticket_id, changed_by, field, old_value, new_value, changed_at
@@ -100,6 +102,10 @@ DELETE /api/notes/:id             — delete own note, admin can delete any (ver
 GET    /api/admin/users           — all users (verifyAdmin)
 PUT    /api/admin/users/:id/role  — change role (verifyAdmin)
 DELETE /api/admin/users/:id       — delete user (verifyAdmin)
+
+GET    /api/buildings             — hardcoded sorted list of campus building names (public)
+
+PATCH  /api/users/profile         — update preferred_name, student_id, building, room_number, phone; sets profile_complete=true (verifyToken)
 ```
 
 ## Key patterns & conventions
@@ -152,3 +158,10 @@ DELETE /api/admin/users/:id       — delete user (verifyAdmin)
 - Dispatcher dashboard bulk actions (select tickets, bulk status update, bulk assign, confirmation modal) complete
 - Backend PUT /api/tickets/bulk endpoint with audit history and socket events complete
 - Student dashboard category filter (dropdown filter bar below stat cards) complete
+- Phase 1 mobile UX overhaul — Auth & Onboarding complete:
+  - users table extended with profile_complete, preferred_name, student_id, building, room_number, phone columns
+  - GET /api/buildings returns hardcoded sorted building list
+  - PATCH /api/users/profile saves campus profile fields and sets profile_complete=true
+  - Login redirects students with profile_complete=false to /onboarding
+  - /onboarding page: required full-screen mobile-first form, no skip, redirects to /dashboard on save
+  - /settings page: same form pre-populated from AuthContext, accessible from student nav in Dashboard

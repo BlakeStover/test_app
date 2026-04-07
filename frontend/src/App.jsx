@@ -13,6 +13,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import TicketDetail from './pages/TicketDetail';
 import Profile from './pages/Profile';
+import Onboarding from './pages/Onboarding';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -58,6 +60,16 @@ function App() {
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/onboarding" element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <Onboarding />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <Settings />
               </ProtectedRoute>
             } />
           </Routes>

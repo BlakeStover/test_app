@@ -9,6 +9,8 @@ const authRoutes = require('./routes/auth');
 const ticketRoutes = require('./routes/tickets');
 const adminRoutes = require('./routes/admin');
 const noteRoutes = require('./routes/notes');
+const buildingRoutes = require('./routes/buildings');
+const userRoutes = require('./routes/users');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,6 +33,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notes', noteRoutes);
+app.use('/api/buildings', buildingRoutes);
+app.use('/api/users', userRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Campus Ticket API is running!' });

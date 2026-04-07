@@ -21,11 +21,13 @@ function Login() {
 
       login(res.data.user, res.data.token);
 
-      const role = res.data.user.role;
+      const { role, profile_complete } = res.data.user;
       if (role === 'dispatcher') {
         window.location.href = '/dispatcher';
       } else if (role === 'admin') {
         window.location.href = '/admin';
+      } else if (!profile_complete) {
+        window.location.href = '/onboarding';
       } else {
         window.location.href = '/dashboard';
       }
