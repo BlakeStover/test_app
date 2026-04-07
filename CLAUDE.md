@@ -34,6 +34,7 @@ frontend/src/
     NewTicket.jsx     — student: submit ticket
     Onboarding.jsx    — student: required profile setup on first login (preferred name, student ID, building, room, phone)
     Settings.jsx      — student: edit campus profile info (same fields as onboarding, pre-populated)
+    TicketWizard.jsx  — student: multi-step ticket submission wizard (/submit); Steps 1 (category) + emergency modal built; Steps 2–4 pending
     Dispatcher.jsx    — dispatcher/admin: all tickets, filters, sort, bulk actions
     TicketDetail.jsx  — any role: view ticket, notes, history timeline
     Admin.jsx         — admin: user management
@@ -173,3 +174,15 @@ PATCH  /api/users/profile         — update preferred_name, student_id, buildin
   - Status pill colors: Open = blue, In Progress = amber, Resolved = green, Closed = gray
   - timeAgo() helper formats relative time (just now / Xm / Xh / Xd / date)
   - Removed: stats cards, filter bar, category dropdown, full ticket list
+- Phase 3 ticket submission wizard — Steps 8–10 complete:
+  - /submit route added (student-only) → TicketWizard.jsx
+  - Shared wizard state: { category, template_id, title, description, building, room_number, notes, photo }
+  - building and room_number pre-populated from AuthContext user profile
+  - 4-dot progress indicator at top of every step (active dot = blue pill, completed = filled blue, future = gray)
+  - Back arrow: returns to /dashboard from step 1, steps back otherwise
+  - Step 1: category selector — 6 tappable icon rows (Lockout/Access, Maintenance, Electrical, Plumbing, Pest Control, Safety/Emergency)
+  - Safety/Emergency row styled red; tapping opens emergency modal instead of advancing wizard
+  - Emergency modal: full-screen overlay, red header, campus safety phone number displayed large, "Call now" (tel: link) + "Go back" button
+  - CAMPUS_SAFETY_PHONE is a configurable constant at the top of TicketWizard.jsx
+  - "Call now" fires a background POST /api/tickets (category: campus_safety, priority: urgent, status: open, title: "Emergency call placed"); fire-and-forget, modal stays open
+  - Note: DB enums have no 'emergency' category or 'critical' priority — campus_safety + urgent used as closest values
