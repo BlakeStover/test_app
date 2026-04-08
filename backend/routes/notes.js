@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { verifyToken } = require('../middleware/auth');
 const { validateNote } = require('../middleware/validate');
+const { sendDispatcherReplyEmail } = require('../utils/email');
 
 // Get all notes for a ticket
 // Students only see notes where internal = false; dispatchers/admins see all
@@ -47,6 +48,25 @@ router.post('/:ticketId', verifyToken, validateNote, async (req, res) => {
     );
 
     res.status(201).json(noteWithAuthor.rows[0]);
+
+    // Email the student when a dispatcher/admin posts a public note on their ticket
+    if (req.user.role !== 'student' && !isInternal) {
+      try {
+        const ticketRes = await pool.query(
+          `SELECT tickets.id, users.email, users.name
+           FROM tickets
+           JOIN users ON tickets.created_by = users.id
+           WHERE tickets.id = $1 AND users.role = 'student'`,
+          [req.params.ticketId]
+        );
+        if (ticketRes.rows.length > 0) {
+          const { id: ticketId, email, name } = ticketRes.rows[0];
+          sendDispatcherReplyEmail(email, name, ticketId, content).catch(() => {});
+        }
+      } catch {
+        // non-critical — don't fail the request
+      }
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

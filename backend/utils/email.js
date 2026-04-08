@@ -86,4 +86,30 @@ const sendStatusUpdateEmail = async (submitter, ticket, newStatus) => {
   }
 };
 
-module.exports = { sendTicketNotification, sendPasswordResetEmail, sendStatusUpdateEmail };
+const sendDispatcherReplyEmail = async (studentEmail, studentName, ticketId, noteContent) => {
+  const ticketLink = `http://localhost:5173/ticket?id=${ticketId}`;
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: studentEmail,
+    subject: `A dispatcher replied to your request #${ticketId}`,
+    html: `
+      <h2>New Reply on Your Request</h2>
+      <p>Hi ${studentName},</p>
+      <p>A dispatcher has replied to your request <strong>#${ticketId}</strong>:</p>
+      <blockquote style="border-left:4px solid #2563eb;margin:16px 0;padding:12px 16px;background:#f0f4ff;border-radius:4px;color:#1e293b;">
+        ${noteContent.replace(/\n/g, '<br/>')}
+      </blockquote>
+      <a href="${ticketLink}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:8px;">View your request</a>
+      <p style="margin-top:16px;color:#666;">You can reply directly in the app.</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('Dispatcher reply email sent');
+  } catch (err) {
+    console.error('Email error:', err);
+  }
+};
+
+module.exports = { sendTicketNotification, sendPasswordResetEmail, sendStatusUpdateEmail, sendDispatcherReplyEmail };

@@ -80,7 +80,7 @@ function TicketDetail() {
     try {
       const res = await axios.post(
         `http://localhost:5000/api/notes/${ticketId}`,
-        { content: newNote },
+        { content: newNote, internal: false },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setNotes((prev) => [...prev, res.data]);
@@ -426,97 +426,154 @@ function TicketDetail() {
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">
-            Notes {notes.length > 0 && (
+            {isStudent ? 'Messages' : 'Notes'}{notes.length > 0 && (
               <span className="text-gray-400 dark:text-gray-500 font-normal text-sm ml-1">({notes.length})</span>
             )}
           </h3>
 
-          {notes.length === 0 ? (
-            <p className="text-gray-400 dark:text-gray-500 text-sm mb-6">No notes yet.</p>
-          ) : (
-            <div className="space-y-4 mb-6">
-              {notes.map((note) => (
-                <div key={note.id} className="border border-gray-100 dark:border-gray-700 rounded-xl p-4">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="text-sm font-medium text-gray-800 dark:text-white">{note.author_name}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${roleColor(note.author_role)}`}>
-                      {note.author_role}
-                    </span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 sm:ml-auto">
-                      {new Date(note.created_at).toLocaleDateString()} at {new Date(note.created_at).toLocaleTimeString()}
-                      {note.edited_at && (
-                        <span className="ml-2 italic">
-                          (edited {new Date(note.edited_at).toLocaleDateString()} at {new Date(note.edited_at).toLocaleTimeString()})
+          {/* Student view: chat bubble thread */}
+          {isStudent ? (
+            <>
+              {notes.length === 0 ? (
+                <p className="text-gray-400 dark:text-gray-500 text-sm mb-4">No messages yet. Replies from the dispatcher will appear here.</p>
+              ) : (
+                <div className="flex flex-col gap-3 mb-4">
+                  {notes.map((note) => {
+                    const isOwn = note.author_role === 'student';
+                    return (
+                      <div key={note.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
+                          isOwn
+                            ? 'bg-blue-600 text-white rounded-br-sm'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-sm'
+                        }`}>
+                          <p className="leading-relaxed">{note.content}</p>
+                        </div>
+                        <span className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 px-1">
+                          {isOwn ? 'You' : note.author_name} · {new Date(note.created_at).toLocaleDateString()} {new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                      )}
-                    </span>
-                  </div>
-
-                  {editingNoteId === note.id ? (
-                    <div>
-                      <textarea
-                        value={editingContent}
-                        onChange={(e) => setEditingContent(e.target.value)}
-                        className={`${inputClass} h-24 resize-none mb-2`}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEditSave(note.id)}
-                          className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition-colors"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={handleEditCancel}
-                          className="text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-3 py-1 rounded-lg transition-colors"
-                        >
-                          Cancel
-                        </button>
                       </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-300 text-sm mb-2">{note.content}</p>
-                      {/* Students cannot edit or delete notes */}
-                      {!isStudent && (note.user_id === user?.id || user?.role === 'admin') && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditStart(note)}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteNote(note.id)}
-                            className="text-xs text-red-600 dark:text-red-400 hover:underline"
-                          >
-                            Delete
-                          </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <form onSubmit={handleAddNote} className="border-t border-gray-100 dark:border-gray-700 pt-4 flex gap-2">
+                <textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  rows={2}
+                  className={`${inputClass} resize-none flex-1`}
+                  placeholder="Reply to dispatcher…"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAddNote(e);
+                    }
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!newNote.trim()}
+                  className="self-end bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shrink-0"
+                >
+                  Send
+                </button>
+              </form>
+            </>
+          ) : (
+            /* Dispatcher/admin view: existing table-style notes */
+            <>
+              {notes.length === 0 ? (
+                <p className="text-gray-400 dark:text-gray-500 text-sm mb-6">No notes yet.</p>
+              ) : (
+                <div className="space-y-4 mb-6">
+                  {notes.map((note) => (
+                    <div key={note.id} className="border border-gray-100 dark:border-gray-700 rounded-xl p-4">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="text-sm font-medium text-gray-800 dark:text-white">{note.author_name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${roleColor(note.author_role)}`}>
+                          {note.author_role}
+                        </span>
+                        {note.internal && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300">
+                            internal
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-400 dark:text-gray-500 sm:ml-auto">
+                          {new Date(note.created_at).toLocaleDateString()} at {new Date(note.created_at).toLocaleTimeString()}
+                          {note.edited_at && (
+                            <span className="ml-2 italic">
+                              (edited {new Date(note.edited_at).toLocaleDateString()} at {new Date(note.edited_at).toLocaleTimeString()})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+
+                      {editingNoteId === note.id ? (
+                        <div>
+                          <textarea
+                            value={editingContent}
+                            onChange={(e) => setEditingContent(e.target.value)}
+                            className={`${inputClass} h-24 resize-none mb-2`}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEditSave(note.id)}
+                              className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition-colors"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={handleEditCancel}
+                              className="text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-3 py-1 rounded-lg transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-gray-600 dark:text-gray-300 text-sm mb-2">{note.content}</p>
+                          {(note.user_id === user?.id || user?.role === 'admin') && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditStart(note)}
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteNote(note.id)}
+                                className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {!isStudent && (
-            <form onSubmit={handleAddNote} className="border-t border-gray-100 dark:border-gray-700 pt-4">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add a note</h4>
-              <textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                className={`${inputClass} h-24 resize-none mb-3`}
-                placeholder="Add a note, update, or comment..."
-              />
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                Add Note
-              </button>
-            </form>
+              <form onSubmit={handleAddNote} className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add a note</h4>
+                <textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  className={`${inputClass} h-24 resize-none mb-3`}
+                  placeholder="Add a note, update, or comment..."
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  Add Note
+                </button>
+              </form>
+            </>
           )}
         </div>
 
