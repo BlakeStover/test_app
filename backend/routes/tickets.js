@@ -114,6 +114,45 @@ router.get('/:id/history', verifyToken, async (req, res) => {
   }
 });
 
+// Cancel a ticket — student can cancel their own open/in_progress ticket
+router.post('/:id/cancel', verifyToken, async (req, res) => {
+  try {
+    const ticket = await pool.query('SELECT * FROM tickets WHERE id = $1', [req.params.id]);
+    if (ticket.rows.length === 0) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+    const t = ticket.rows[0];
+
+    if (t.created_by !== req.user.id) {
+      return res.status(403).json({ message: 'You can only cancel your own tickets' });
+    }
+    if (['resolved', 'closed'].includes(t.status)) {
+      return res.status(400).json({ message: 'This ticket cannot be cancelled' });
+    }
+
+    const updated = await pool.query(
+      'UPDATE tickets SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      ['closed', req.params.id]
+    );
+
+    await pool.query(
+      'INSERT INTO ticket_history (ticket_id, changed_by, field, old_value, new_value) VALUES ($1, $2, $3, $4, $5)',
+      [req.params.id, req.user.id, 'status', t.status, 'closed']
+    );
+
+    await pool.query(
+      'INSERT INTO notes (ticket_id, user_id, content, internal) VALUES ($1, $2, $3, $4)',
+      [req.params.id, req.user.id, 'This request was cancelled by the student.', false]
+    );
+
+    req.io.emit('ticket_updated', updated.rows[0]);
+    res.json(updated.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Bulk update tickets - dispatchers and admins only
 router.put('/bulk', verifyDispatcher, async (req, res) => {
   const { ids, status, assigned_to } = req.body;

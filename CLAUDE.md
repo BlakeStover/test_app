@@ -72,7 +72,7 @@ EMAIL_PASS=gmail app password
 ## Database tables
 - **users** — id, name, email, password (hashed), role, reset_token, reset_token_expiry, profile_complete (bool default false), preferred_name, student_id, building, room_number, phone
 - **tickets** — id, title, description, category, priority, status, created_by (FK users), assigned_to (FK users), created_at, updated_at
-- **notes** — id, ticket_id, user_id, content, created_at, updated_at
+- **notes** — id, ticket_id, user_id, content, internal (bool default false), created_at, updated_at
 - **ticket_history** — id, ticket_id, changed_by, field, old_value, new_value, changed_at
 
 ### Enum values
@@ -97,6 +97,7 @@ GET    /api/tickets/:id/history   — audit log (verifyToken)
 POST   /api/tickets               — create ticket (verifyToken)
 PUT    /api/tickets/bulk          — bulk update status/assigned_to (verifyDispatcher)
 PUT    /api/tickets/:id           — update status/priority/assigned_to (verifyDispatcher)
+POST   /api/tickets/:id/cancel    — student cancels own ticket (verifyToken); sets status closed, adds history + note
 
 GET    /api/notes/:ticketId       — notes for a ticket (verifyToken)
 POST   /api/notes/:ticketId       — add note (verifyToken)
@@ -200,3 +201,7 @@ PATCH  /api/users/profile         — update preferred_name, student_id, buildin
   - tickets POST updated to accept and store photo_filename; requires DB migration: ALTER TABLE tickets ADD COLUMN IF NOT EXISTS photo_filename VARCHAR(255);
   - Category → DB enum mapping: lockout/emergency → campus_safety, maintenance/electrical/plumbing → maintenance, pest → cleaning
   - Dashboard "Submit a request" button now routes to /submit instead of /new-ticket
+- Phase 4 student ticket detail overhaul — Steps 15–16 complete:
+  - Step 15: TicketDetail.jsx updated — student view is fully read-only (no note edit/delete, status/assignment controls already gated to dispatcher/admin); photo displayed as tappable thumbnail with fullscreen lightbox overlay; status labels humanized (in_progress → "In Progress"); student layout uses max-w-lg, dispatcher uses max-w-4xl
+  - Step 16: notes table migration — ALTER TABLE notes ADD COLUMN IF NOT EXISTS internal BOOLEAN NOT NULL DEFAULT false; GET /api/notes/:ticketId filters out internal=true notes for students, dispatchers/admins see all; POST /api/notes/:ticketId accepts internal field, students are always forced to internal=false regardless of payload
+  - Student cancel flow: students cannot add notes; "Cancel this request" button shown when status is open/in_progress; confirmation modal ("Are you sure?"); POST /api/tickets/:id/cancel sets status to closed, inserts ticket_history row, inserts a public note "This request was cancelled by the student.", emits socket event; endpoint verifies ticket belongs to requesting user and is not already resolved/closed

@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(psql \"postgresql://postgres:admin123@localhost:5432/test_app\")",
-      "Bash(psql \"postgresql://postgres:admin123@localhost:5432/test_app\" -c \"\\\\d users\")"
+      "Bash(psql \"postgresql://postgres:admin123@localhost:5432/test_app\" -c \"\\\\d users\")",
+      "Bash(node -e \"const pool = require\\('./config/db'\\); pool.query\\('ALTER TABLE notes ADD COLUMN IF NOT EXISTS internal BOOLEAN NOT NULL DEFAULT false'\\).then\\(\\(\\) => { console.log\\('Migration done'\\); pool.end\\(\\); }\\).catch\\(e => { console.error\\(e.message\\); pool.end\\(\\); }\\);\")"
     ]
   }
 }

@@ -5,13 +5,16 @@ const { verifyToken } = require('../middleware/auth');
 const { validateNote } = require('../middleware/validate');
 
 // Get all notes for a ticket
+// Students only see notes where internal = false; dispatchers/admins see all
 router.get('/:ticketId', verifyToken, async (req, res) => {
   try {
+    const isStudent = req.user.role === 'student';
     const notes = await pool.query(
       `SELECT notes.*, users.name as author_name, users.role as author_role
        FROM notes
        LEFT JOIN users ON notes.user_id = users.id
        WHERE notes.ticket_id = $1
+         ${isStudent ? 'AND notes.internal = false' : ''}
        ORDER BY notes.created_at ASC`,
       [req.params.ticketId]
     );
@@ -24,13 +27,15 @@ router.get('/:ticketId', verifyToken, async (req, res) => {
 
 // Add a note to a ticket
 router.post('/:ticketId', verifyToken, validateNote, async (req, res) => {
-  const { content } = req.body;
+  const { content, internal } = req.body;
+  // Students can only post public notes; dispatchers/admins can mark notes internal
+  const isInternal = req.user.role !== 'student' && internal === true;
   try {
     const newNote = await pool.query(
-      `INSERT INTO notes (ticket_id, user_id, content)
-       VALUES ($1, $2, $3)
+      `INSERT INTO notes (ticket_id, user_id, content, internal)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [req.params.ticketId, req.user.id, content]
+      [req.params.ticketId, req.user.id, content, isInternal]
     );
 
     const noteWithAuthor = await pool.query(

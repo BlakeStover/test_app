@@ -15,8 +15,14 @@ function TicketDetail() {
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingContent, setEditingContent] = useState('');
   const [error, setError] = useState('');
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const { user, token } = useAuth();
   const ticketId = new URLSearchParams(window.location.search).get('id');
+
+  const isStudent = user?.role === 'student';
+  const isDispatcherOrAdmin = user?.role === 'dispatcher' || user?.role === 'admin';
 
   useEffect(() => {
     const getTicket = async () => {
@@ -59,14 +65,14 @@ function TicketDetail() {
   }, [ticketId, token]);
 
   useEffect(() => {
-    if (user?.role !== 'dispatcher' && user?.role !== 'admin') return;
+    if (!isDispatcherOrAdmin) return;
     axios
       .get('http://localhost:5000/api/tickets/assignees', {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => setAssignees(res.data))
       .catch(() => {});
-  }, [token, user]);
+  }, [token, isDispatcherOrAdmin]);
 
   const handleAddNote = async (e) => {
     e.preventDefault();
@@ -121,6 +127,29 @@ function TicketDetail() {
     }
   };
 
+  const handleCancelTicket = async () => {
+    setCancelling(true);
+    try {
+      const res = await axios.post(
+        `http://localhost:5000/api/tickets/${ticketId}/cancel`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTicket(res.data);
+      // Refresh notes so the cancellation note appears
+      const notesRes = await axios.get(`http://localhost:5000/api/notes/${ticketId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setNotes(notesRes.data);
+      setCancelConfirm(false);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to cancel ticket');
+      setCancelConfirm(false);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const refreshHistory = async () => {
     try {
       const res = await axios.get(`http://localhost:5000/api/tickets/${ticketId}/history`, {
@@ -166,11 +195,21 @@ function TicketDetail() {
 
   const statusColor = (status) => {
     switch (status) {
-      case 'open': return 'bg-yellow-100 text-yellow-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'resolved': return 'bg-green-100 text-green-800';
-      case 'closed': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-yellow-100 text-yellow-800';
+      case 'open': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
+      case 'in_progress': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+      case 'resolved': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+      case 'closed': return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
+      default: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
+    }
+  };
+
+  const statusLabel = (status) => {
+    switch (status) {
+      case 'open': return 'Open';
+      case 'in_progress': return 'In Progress';
+      case 'resolved': return 'Resolved';
+      case 'closed': return 'Closed';
+      default: return status;
     }
   };
 
@@ -204,9 +243,7 @@ function TicketDetail() {
     return value ?? '—';
   };
 
-  const backUrl = user?.role === 'dispatcher' || user?.role === 'admin'
-    ? '/dispatcher'
-    : '/dashboard';
+  const backUrl = isDispatcherOrAdmin ? '/dispatcher' : '/dashboard';
 
   const inputClass = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white';
   const selectClass = 'text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white';
@@ -221,6 +258,55 @@ function TicketDetail() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
+      {/* Cancel confirmation modal */}
+      {cancelConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Cancel this request?</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Are you sure you would like to cancel this request? This cannot be undone.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleCancelTicket}
+                disabled={cancelling}
+                className="w-full bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:opacity-40 text-white font-semibold py-3 rounded-xl transition-colors"
+              >
+                {cancelling ? 'Cancelling…' : 'Yes, cancel it'}
+              </button>
+              <button
+                onClick={() => setCancelConfirm(false)}
+                disabled={cancelling}
+                className="w-full border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 font-medium py-3 rounded-xl transition-colors hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-40"
+              >
+                Keep request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen photo lightbox */}
+      {photoOpen && ticket?.photo_filename && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setPhotoOpen(false)}
+        >
+          <img
+            src={`http://localhost:5000/uploads/${ticket.photo_filename}`}
+            alt="Ticket photo"
+            className="max-w-full max-h-full object-contain rounded-xl"
+          />
+          <button
+            onClick={() => setPhotoOpen(false)}
+            className="absolute top-4 right-4 w-9 h-9 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center text-lg leading-none transition-colors"
+            aria-label="Close photo"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <Navbar>
         <button
           onClick={() => window.location.href = backUrl}
@@ -230,7 +316,7 @@ function TicketDetail() {
         </button>
       </Navbar>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className={`mx-auto px-4 py-8 ${isStudent ? 'max-w-lg' : 'max-w-4xl'}`}>
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
         )}
@@ -248,7 +334,7 @@ function TicketDetail() {
             </div>
             <div className="flex gap-2 shrink-0">
               <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusColor(ticket.status)}`}>
-                {ticket.status}
+                {statusLabel(ticket.status)}
               </span>
               <span className={`text-xs font-medium px-3 py-1 rounded-full ${priorityColor(ticket.priority)}`}>
                 {ticket.priority}
@@ -258,27 +344,47 @@ function TicketDetail() {
 
           <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mb-4">
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</h3>
-            <p className="text-gray-600 dark:text-gray-300 text-sm">{ticket.description}</p>
+            <p className="text-gray-600 dark:text-gray-300 text-sm whitespace-pre-wrap">{ticket.description}</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 dark:border-gray-700 pt-4">
+          {/* Photo */}
+          {ticket.photo_filename && (
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mb-4">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Photo</h3>
+              <button
+                onClick={() => setPhotoOpen(true)}
+                className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-xl"
+                aria-label="View full-size photo"
+              >
+                <img
+                  src={`http://localhost:5000/uploads/${ticket.photo_filename}`}
+                  alt="Ticket photo"
+                  className="w-28 h-28 object-cover rounded-xl border border-gray-200 dark:border-gray-700 hover:opacity-90 active:opacity-75 transition-opacity cursor-pointer"
+                />
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4 border-t border-gray-100 dark:border-gray-700 pt-4">
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Category</p>
-              <p className="text-sm text-gray-700 dark:text-gray-200 font-medium">{ticket.category}</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200 font-medium capitalize">{ticket.category.replace('_', ' ')}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Last updated</p>
               <p className="text-sm text-gray-700 dark:text-gray-200 font-medium">{new Date(ticket.updated_at).toLocaleDateString()}</p>
             </div>
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Assigned to</p>
-              <p className="text-sm text-gray-700 dark:text-gray-200 font-medium">
-                {ticket.assigned_to_name ?? <span className="text-gray-400 dark:text-gray-500 font-normal">Unassigned</span>}
-              </p>
-            </div>
+            {isDispatcherOrAdmin && (
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Assigned to</p>
+                <p className="text-sm text-gray-700 dark:text-gray-200 font-medium">
+                  {ticket.assigned_to_name ?? <span className="text-gray-400 dark:text-gray-500 font-normal">Unassigned</span>}
+                </p>
+              </div>
+            )}
           </div>
 
-          {(user?.role === 'dispatcher' || user?.role === 'admin') && (
+          {isDispatcherOrAdmin && (
             <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mt-4 flex flex-wrap gap-6">
               <div>
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</h3>
@@ -326,7 +432,7 @@ function TicketDetail() {
           </h3>
 
           {notes.length === 0 ? (
-            <p className="text-gray-400 dark:text-gray-500 text-sm mb-6">No notes yet — be the first to add one.</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm mb-6">No notes yet.</p>
           ) : (
             <div className="space-y-4 mb-6">
               {notes.map((note) => (
@@ -371,7 +477,8 @@ function TicketDetail() {
                   ) : (
                     <div>
                       <p className="text-gray-600 dark:text-gray-300 text-sm mb-2">{note.content}</p>
-                      {(note.user_id === user?.id || user?.role === 'admin') && (
+                      {/* Students cannot edit or delete notes */}
+                      {!isStudent && (note.user_id === user?.id || user?.role === 'admin') && (
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleEditStart(note)}
@@ -394,22 +501,36 @@ function TicketDetail() {
             </div>
           )}
 
-          <form onSubmit={handleAddNote} className="border-t border-gray-100 dark:border-gray-700 pt-4">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add a note</h4>
-            <textarea
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              className={`${inputClass} h-24 resize-none mb-3`}
-              placeholder="Add a note, update, or comment..."
-            />
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              Add Note
-            </button>
-          </form>
+          {!isStudent && (
+            <form onSubmit={handleAddNote} className="border-t border-gray-100 dark:border-gray-700 pt-4">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add a note</h4>
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                className={`${inputClass} h-24 resize-none mb-3`}
+                placeholder="Add a note, update, or comment..."
+              />
+              <button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Add Note
+              </button>
+            </form>
+          )}
         </div>
+
+        {/* Cancel button — students only, only when ticket is still open/in_progress */}
+        {isStudent && ['open', 'in_progress'].includes(ticket.status) && (
+          <div className="mt-4">
+            <button
+              onClick={() => setCancelConfirm(true)}
+              className="w-full border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 font-medium py-3 rounded-2xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              Cancel this request
+            </button>
+          </div>
+        )}
 
         <div className="mt-8 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden">
           <button
