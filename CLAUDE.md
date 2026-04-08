@@ -198,7 +198,7 @@ PATCH  /api/users/profile         — update preferred_name, student_id, buildin
   - Success screen: checkmark, ticket number, "Back to home" primary button, "Track this ticket" ghost button
   - multer installed in backend; POST /api/uploads — saves to backend/uploads/, returns { filename }; jpeg/png/webp only, 5MB max
   - Uploaded files served statically at GET /uploads/:filename
-  - tickets POST updated to accept and store photo_filename; requires DB migration: ALTER TABLE tickets ADD COLUMN IF NOT EXISTS photo_filename VARCHAR(255);
+  - tickets POST updated to accept and store photo_filename; DB migration applied: ALTER TABLE tickets ADD COLUMN IF NOT EXISTS photo_filename VARCHAR(255);
   - Category → DB enum mapping: lockout/emergency → campus_safety, maintenance/electrical/plumbing → maintenance, pest → cleaning
   - Dashboard "Submit a request" button now routes to /submit instead of /new-ticket
 - Phase 4 student ticket detail overhaul — Steps 15–16 complete:
@@ -208,3 +208,6 @@ PATCH  /api/users/profile         — update preferred_name, student_id, buildin
 - Phase 4 student ticket detail overhaul — Steps 17–18 complete:
   - Step 17: Student notes section reframed as a message thread ("Messages" heading); dispatcher/admin notes appear as left-aligned gray bubbles, student notes as right-aligned blue bubbles; timestamp + author shown below each bubble; student reply textarea at bottom with placeholder "Reply to dispatcher…"; Enter sends (Shift+Enter for newline); Send button disabled when empty; students cannot edit or delete any notes; dispatcher/admin view unchanged (table-style with edit/delete/internal badge)
   - Step 18: Backend (backend/routes/notes.js) triggers sendDispatcherReplyEmail (fire-and-forget) when a dispatcher or admin posts a public (internal=false) note on a ticket; looks up the ticket's student submitter, emails them with subject "A dispatcher replied to your request #[id]", includes the note content in a blockquote, and a direct link to the ticket; sendDispatcherReplyEmail added to backend/utils/email.js
+- Bug fixes (post Phase 4):
+  - DB migration for photo_filename was never applied — ALTER TABLE tickets ADD COLUMN IF NOT EXISTS photo_filename VARCHAR(255) now run; was causing 500 on every ticket submission
+  - TicketWizard.jsx photo upload was manually setting Content-Type: 'multipart/form-data' without the boundary string, breaking multer's ability to parse the file; fixed by removing the manual header and letting axios set it automatically with the correct boundary

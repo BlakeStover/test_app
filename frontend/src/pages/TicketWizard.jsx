@@ -573,7 +573,8 @@ function TicketWizard() {
         const uploadRes = await axios.post('http://localhost:5000/api/uploads', formData, {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
+            // Do NOT manually set Content-Type here — axios auto-sets it with the
+            // correct multipart boundary when the body is a FormData object.
           },
         });
         photoFilename = uploadRes.data.filename;
