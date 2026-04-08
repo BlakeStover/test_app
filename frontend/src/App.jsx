@@ -16,6 +16,7 @@ import Profile from './pages/Profile';
 import Onboarding from './pages/Onboarding';
 import Settings from './pages/Settings';
 import TicketWizard from './pages/TicketWizard';
+import MyTickets from './pages/MyTickets';
 
 function App() {
   return (
@@ -76,6 +77,11 @@ function App() {
             <Route path="/submit" element={
               <ProtectedRoute allowedRoles={['student']}>
                 <TicketWizard />
+              </ProtectedRoute>
+            } />
+            <Route path="/my-tickets" element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <MyTickets />
               </ProtectedRoute>
             } />
           </Routes>

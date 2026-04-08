@@ -12,6 +12,7 @@ function TicketDetail() {
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [newNote, setNewNote] = useState('');
+  const [isInternal, setIsInternal] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingContent, setEditingContent] = useState('');
   const [error, setError] = useState('');
@@ -80,11 +81,12 @@ function TicketDetail() {
     try {
       const res = await axios.post(
         `http://localhost:5000/api/notes/${ticketId}`,
-        { content: newNote, internal: false },
+        { content: newNote, internal: isDispatcherOrAdmin ? isInternal : false },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setNotes((prev) => [...prev, res.data]);
       setNewNote('');
+      setIsInternal(false);
     } catch {
       setError('Failed to add note');
     }
@@ -560,11 +562,27 @@ function TicketDetail() {
 
               <form onSubmit={handleAddNote} className="border-t border-gray-100 dark:border-gray-700 pt-4">
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add a note</h4>
+                <label className="flex items-center gap-2 mb-3 cursor-pointer select-none w-fit">
+                  <div
+                    onClick={() => setIsInternal((v) => !v)}
+                    className={`relative w-9 h-5 rounded-full transition-colors ${isInternal ? 'bg-yellow-400' : 'bg-gray-300 dark:bg-gray-600'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isInternal ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </div>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    Internal note
+                    {isInternal && (
+                      <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300">
+                        hidden from student
+                      </span>
+                    )}
+                  </span>
+                </label>
                 <textarea
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
                   className={`${inputClass} h-24 resize-none mb-3`}
-                  placeholder="Add a note, update, or comment..."
+                  placeholder={isInternal ? 'Internal note (not visible to student)…' : 'Add a note, update, or comment...'}
                 />
                 <button
                   type="submit"
@@ -578,7 +596,7 @@ function TicketDetail() {
         </div>
 
         {/* Cancel button — students only, only when ticket is still open/in_progress */}
-        {isStudent && ['open', 'in_progress'].includes(ticket.status) && (
+        {isStudent && ticket.status === 'open' && (
           <div className="mt-4">
             <button
               onClick={() => setCancelConfirm(true)}
@@ -589,7 +607,7 @@ function TicketDetail() {
           </div>
         )}
 
-        <div className="mt-8 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden">
+        {isDispatcherOrAdmin && <div className="mt-8 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden">
           <button
             onClick={() => setHistoryOpen((o) => !o)}
             className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -635,7 +653,7 @@ function TicketDetail() {
               )}
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );

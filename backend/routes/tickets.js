@@ -114,7 +114,7 @@ router.get('/:id/history', verifyToken, async (req, res) => {
   }
 });
 
-// Cancel a ticket — student can cancel their own open/in_progress ticket
+// Cancel a ticket — student can cancel their own open ticket only
 router.post('/:id/cancel', verifyToken, async (req, res) => {
   try {
     const ticket = await pool.query('SELECT * FROM tickets WHERE id = $1', [req.params.id]);
@@ -126,7 +126,7 @@ router.post('/:id/cancel', verifyToken, async (req, res) => {
     if (t.created_by !== req.user.id) {
       return res.status(403).json({ message: 'You can only cancel your own tickets' });
     }
-    if (['resolved', 'closed'].includes(t.status)) {
+    if (t.status !== 'open') {
       return res.status(400).json({ message: 'This ticket cannot be cancelled' });
     }
 
