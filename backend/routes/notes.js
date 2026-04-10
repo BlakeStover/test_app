@@ -40,13 +40,16 @@ router.post('/:ticketId', verifyToken, validateNote, async (req, res) => {
     );
 
     const noteWithAuthor = await pool.query(
-      `SELECT notes.*, users.name as author_name, users.role as author_role
+      `SELECT notes.*, users.name as author_name, users.role as author_role,
+              tickets.created_by as ticket_created_by
        FROM notes
        LEFT JOIN users ON notes.user_id = users.id
+       LEFT JOIN tickets ON notes.ticket_id = tickets.id
        WHERE notes.id = $1`,
       [newNote.rows[0].id]
     );
 
+    req.io.emit('note_added', noteWithAuthor.rows[0]);
     res.status(201).json(noteWithAuthor.rows[0]);
 
     // Email the student when a dispatcher/admin posts a public note on their ticket

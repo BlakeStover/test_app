@@ -52,6 +52,29 @@ router.get('/assignees', verifyDispatcher, async (req, res) => {
   }
 });
 
+// Check if the student already has an open ticket for the same category + building
+router.get('/check-duplicate', verifyToken, async (req, res) => {
+  const { category, building } = req.query;
+  if (!category || !building) {
+    return res.status(400).json({ message: 'category and building are required' });
+  }
+  try {
+    const result = await pool.query(
+      `SELECT id FROM tickets
+       WHERE created_by = $1
+         AND category = $2
+         AND status IN ('open', 'in_progress')
+         AND description ILIKE $3
+       LIMIT 1`,
+      [req.user.id, category, `%Location: ${building}%`]
+    );
+    res.json({ duplicate: result.rows.length > 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Get single ticket - any logged in user
 router.get('/:id', verifyToken, async (req, res) => {
   try {
@@ -268,6 +291,34 @@ router.put('/:id', verifyDispatcher, validateUpdateTicket, async (req, res) => {
 
     req.io.emit('ticket_updated', updatedTicket.rows[0]);
     res.json(updatedTicket.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Rate a resolved ticket — student rates their own ticket (1–5)
+router.patch('/:id/rate', verifyToken, async (req, res) => {
+  const rating = Number(req.body.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ message: 'Rating must be an integer between 1 and 5' });
+  }
+  try {
+    const ticket = await pool.query('SELECT * FROM tickets WHERE id = $1', [req.params.id]);
+    if (ticket.rows.length === 0) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+    if (ticket.rows[0].created_by !== req.user.id) {
+      return res.status(403).json({ message: 'You can only rate your own tickets' });
+    }
+    if (ticket.rows[0].status !== 'resolved') {
+      return res.status(400).json({ message: 'You can only rate resolved tickets' });
+    }
+    const updated = await pool.query(
+      'UPDATE tickets SET rating = $1 WHERE id = $2 RETURNING *',
+      [rating, req.params.id]
+    );
+    res.json(updated.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
+import { STUDENT_STATUS_LABELS } from '../constants/wizardTemplates';
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -16,12 +17,13 @@ function timeAgo(dateStr) {
 }
 
 const statusPill = (status) => {
+  const label = STUDENT_STATUS_LABELS[status] || status;
   switch (status) {
-    case 'open':        return { label: 'Open',        cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' };
-    case 'in_progress': return { label: 'In Progress',  cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' };
-    case 'resolved':    return { label: 'Resolved',     cls: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' };
-    case 'closed':      return { label: 'Closed',       cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' };
-    default:            return { label: status,         cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' };
+    case 'open':        return { label, cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' };
+    case 'in_progress': return { label, cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' };
+    case 'resolved':    return { label, cls: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' };
+    case 'closed':      return { label, cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' };
+    default:            return { label, cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' };
   }
 };
 
@@ -82,6 +84,7 @@ function MyTickets() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [ratingTarget, setRatingTarget] = useState(null);
   const { token } = useAuth();
 
   useEffect(() => {
@@ -100,11 +103,76 @@ function MyTickets() {
     fetchTickets();
   }, [token]);
 
+  // Find the first resolved, unrated, un-dismissed ticket to prompt for rating
+  useEffect(() => {
+    if (loading || tickets.length === 0) return;
+    const dismissed = JSON.parse(localStorage.getItem('ratingDismissed') || '[]');
+    const target = tickets.find(
+      (t) => t.status === 'resolved' && t.rating == null && !dismissed.includes(t.id)
+    );
+    setRatingTarget(target || null);
+  }, [tickets, loading]);
+
+  const handleRate = async (rating) => {
+    if (!ratingTarget) return;
+    try {
+      await axios.patch(
+        `http://localhost:5000/api/tickets/${ratingTarget.id}/rate`,
+        { rating },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTickets((prev) =>
+        prev.map((t) => (t.id === ratingTarget.id ? { ...t, rating } : t))
+      );
+    } catch { /* non-critical */ }
+    setRatingTarget(null);
+  };
+
+  const handleSkipRating = () => {
+    if (!ratingTarget) return;
+    const dismissed = JSON.parse(localStorage.getItem('ratingDismissed') || '[]');
+    localStorage.setItem('ratingDismissed', JSON.stringify([...dismissed, ratingTarget.id]));
+    setRatingTarget(null);
+  };
+
   const activeTickets = tickets.filter((t) => ['open', 'in_progress'].includes(t.status));
   const closedTickets = tickets.filter((t) => ['resolved', 'closed'].includes(t.status));
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
+      {/* Rating bottom sheet */}
+      {ratingTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={handleSkipRating} />
+          <div className="relative bg-white dark:bg-gray-800 w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-xl px-6 pt-8 pb-10">
+            <p className="text-xs text-gray-400 dark:text-gray-500 text-center mb-1 truncate px-4">
+              {ratingTarget.title}
+            </p>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white text-center mb-6">
+              How did we do?
+            </h2>
+            <div className="flex justify-center gap-4 mb-6">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => handleRate(star)}
+                  aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                  className="text-4xl leading-none text-amber-400 hover:scale-110 active:scale-90 transition-transform"
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleSkipRating}
+              className="w-full text-sm text-gray-400 dark:text-gray-500 py-2 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
+
       <Navbar>
         <button
           onClick={() => window.location.href = '/dashboard'}

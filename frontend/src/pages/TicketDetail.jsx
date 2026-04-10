@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
+import { STUDENT_STATUS_LABELS } from '../constants/wizardTemplates';
+
+const CATEGORY_SLA = {
+  campus_safety: 'Usually responded to within 30 minutes',
+  maintenance:   'Usually responded to within 24 hours',
+  it:            'Usually responded to within 2 business days',
+  cleaning:      'Usually responded to within 48 hours',
+  other:         'Usually responded to within 2 business days',
+};
 
 function TicketDetail() {
   const [ticket, setTicket] = useState(null);
@@ -64,6 +74,32 @@ function TicketDetail() {
       Promise.all([getTicket(), getNotes(), getHistory()]).finally(() => setLoading(false));
     }
   }, [ticketId, token]);
+
+  // Real-time updates via Socket.io
+  useEffect(() => {
+    if (!ticketId) return;
+    const socket = io('http://localhost:5000');
+
+    socket.on('ticket_updated', (updated) => {
+      if (String(updated.id) === String(ticketId)) {
+        setTicket(updated);
+      }
+    });
+
+    socket.on('note_added', (note) => {
+      if (String(note.ticket_id) === String(ticketId)) {
+        // Students never see internal notes — filter them out
+        if (isStudent && note.internal) return;
+        setNotes((prev) => {
+          // Avoid duplicates (student's own note already appended optimistically)
+          if (prev.some((n) => n.id === note.id)) return prev;
+          return [...prev, note];
+        });
+      }
+    });
+
+    return () => socket.disconnect();
+  }, [ticketId, isStudent]);
 
   useEffect(() => {
     if (!isDispatcherOrAdmin) return;
@@ -206,6 +242,7 @@ function TicketDetail() {
   };
 
   const statusLabel = (status) => {
+    if (isStudent) return STUDENT_STATUS_LABELS[status] || status;
     switch (status) {
       case 'open': return 'Open';
       case 'in_progress': return 'In Progress';
@@ -343,6 +380,12 @@ function TicketDetail() {
               </span>
             </div>
           </div>
+
+          {isStudent && CATEGORY_SLA[ticket.category] && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+              {CATEGORY_SLA[ticket.category]}
+            </p>
+          )}
 
           <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mb-4">
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</h3>

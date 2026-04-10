@@ -161,3 +161,12 @@ export const CATEGORY_LABEL = {
   plumbing: 'Plumbing',
   pest: 'Pest Control',
 };
+
+// Student-facing status labels (never shown to dispatchers/admins)
+export const STUDENT_STATUS_LABELS = {
+  open: 'Waiting to be assigned',
+  in_progress: 'Someone is on the way',
+  resolved: 'Issue closed',
+  closed: 'Request closed',
+  cancelled: 'Request cancelled',
+};

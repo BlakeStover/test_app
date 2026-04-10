@@ -4,7 +4,11 @@ const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
 require('dotenv').config();
-require('./config/db');
+const pool = require('./config/db');
+
+// Auto-migrations — safe to run repeatedly (IF NOT EXISTS / idempotent)
+pool.query('ALTER TABLE tickets ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating >= 1 AND rating <= 5)')
+  .catch((err) => console.error('Migration error (rating):', err));
 
 const authRoutes = require('./routes/auth');
 const ticketRoutes = require('./routes/tickets');

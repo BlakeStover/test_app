@@ -436,8 +436,24 @@ function Step3({ form, setForm, photoPreview, setPhotoPreview, onNext }) {
 }
 
 // ── Step 4: Confirm & Submit ─────────────────────────────────────────────────
-function Step4({ form, photoPreview, onEditAll, onSubmit, submitting, error }) {
+function Step4({ form, photoPreview, onEditAll, onSubmit, submitting, error, token }) {
   const effectiveTitle = form.title || CATEGORY_DEFAULT_TITLE[form.category] || 'New Request';
+  // null = still checking, false = no dupe, true = dupe found
+  const [dupeFound, setDupeFound] = useState(null);
+  const [ignoreDupe, setIgnoreDupe] = useState(false);
+
+  useEffect(() => {
+    const dbCategory = CATEGORY_DB_MAP[form.category] || 'other';
+    axios
+      .get('http://localhost:5000/api/tickets/check-duplicate', {
+        params: { category: dbCategory, building: form.building },
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => setDupeFound(res.data.duplicate))
+      .catch(() => setDupeFound(false));
+  }, [form.category, form.building, token]);
+
+  const showWarning = dupeFound && !ignoreDupe;
 
   return (
     <div>
@@ -466,20 +482,46 @@ function Step4({ form, photoPreview, onEditAll, onSubmit, submitting, error }) {
         </div>
       )}
 
-      <button
-        onClick={onSubmit}
-        disabled={submitting}
-        className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-base py-4 rounded-2xl transition-colors shadow-sm mb-3"
-      >
-        {submitting ? 'Submitting…' : 'Submit request'}
-      </button>
-      <button
-        onClick={onEditAll}
-        disabled={submitting}
-        className="w-full border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 font-medium text-base py-4 rounded-2xl transition-colors hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-40"
-      >
-        Edit something
-      </button>
+      {showWarning && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-2xl p-4 mb-4">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
+            You already have an open {CATEGORY_LABEL[form.category]} request for {form.building} — are you sure you want to submit another?
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => setIgnoreDupe(true)}
+              className="w-full bg-yellow-100 dark:bg-yellow-900/40 hover:bg-yellow-200 dark:hover:bg-yellow-800/60 text-yellow-800 dark:text-yellow-200 font-medium py-2.5 rounded-xl text-sm transition-colors"
+            >
+              Yes, submit anyway
+            </button>
+            <button
+              onClick={onEditAll}
+              className="w-full border border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300 font-medium py-2.5 rounded-xl text-sm transition-colors hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+            >
+              Go back
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!showWarning && (
+        <>
+          <button
+            onClick={onSubmit}
+            disabled={submitting || dupeFound === null}
+            className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-base py-4 rounded-2xl transition-colors shadow-sm mb-3"
+          >
+            {submitting ? 'Submitting…' : dupeFound === null ? 'Checking…' : 'Submit request'}
+          </button>
+          <button
+            onClick={onEditAll}
+            disabled={submitting}
+            className="w-full border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 font-medium text-base py-4 rounded-2xl transition-colors hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-40"
+          >
+            Edit something
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -666,6 +708,7 @@ function TicketWizard() {
               onSubmit={handleSubmit}
               submitting={submitting}
               error={submitError}
+              token={token}
             />
           )}
         </div>
