@@ -42,4 +42,35 @@ router.patch('/profile', verifyToken, validateUpdateProfile, async (req, res) =>
   }
 });
 
+// GET /api/users/availability — return current user's availability
+router.get('/availability', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT available FROM users WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+    res.json({ available: result.rows[0].available });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PATCH /api/users/availability — set on-duty / off-duty
+router.patch('/availability', verifyToken, async (req, res) => {
+  const { available } = req.body;
+  if (typeof available !== 'boolean') {
+    return res.status(400).json({ message: 'available must be a boolean' });
+  }
+  try {
+    const result = await pool.query(
+      'UPDATE users SET available = $1 WHERE id = $2 RETURNING id, available',
+      [available, req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+    res.json({ available: result.rows[0].available });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

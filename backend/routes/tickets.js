@@ -5,6 +5,20 @@ const { verifyToken, verifyDispatcher } = require('../middleware/auth');
 const { sendTicketNotification, sendStatusUpdateEmail } = require('../utils/email');
 const { validateCreateTicket, validateUpdateTicket } = require('../middleware/validate');
 
+const SLA_HOURS = {
+  campus_safety: 0.5,
+  maintenance: 24,
+  it: 48,
+  cleaning: 48,
+  other: 48,
+};
+
+function computeIsOverdue(t) {
+  if (t.status !== 'open' && t.status !== 'in_progress') return false;
+  const sla = SLA_HOURS[t.category] ?? 48;
+  return (Date.now() - new Date(t.created_at).getTime()) / 3600000 > sla;
+}
+
 // Get tickets for logged in student
 router.get('/my-tickets', verifyToken, async (req, res) => {
   try {
@@ -32,18 +46,20 @@ router.get('/', verifyDispatcher, async (req, res) => {
        LEFT JOIN users assignee ON tickets.assigned_to = assignee.id
        ORDER BY tickets.created_at DESC`
     );
-    res.json(tickets.rows);
+    res.json(tickets.rows.map((t) => ({ ...t, is_overdue: computeIsOverdue(t) })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get dispatchers and admins available for assignment
+// Get dispatchers and admins available for assignment (off-duty dispatchers excluded; admins always included)
 router.get('/assignees', verifyDispatcher, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, name FROM users WHERE role IN ('dispatcher', 'admin') ORDER BY name ASC"
+      `SELECT id, name FROM users
+       WHERE role = 'admin' OR (role = 'dispatcher' AND available = true)
+       ORDER BY name ASC`
     );
     res.json(result.rows);
   } catch (err) {
@@ -88,7 +104,8 @@ router.get('/:id', verifyToken, async (req, res) => {
     if (ticket.rows.length === 0) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
-    res.json(ticket.rows[0]);
+    const t = ticket.rows[0];
+    res.json({ ...t, is_overdue: computeIsOverdue(t) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

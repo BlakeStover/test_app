@@ -29,6 +29,12 @@ function TicketDetail() {
   const [photoOpen, setPhotoOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  // Step 32: reply templates
+  const [templates, setTemplates] = useState([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [templateShared, setTemplateShared] = useState(false);
   const { user, token } = useAuth();
   const ticketId = new URLSearchParams(window.location.search).get('id');
 
@@ -108,6 +114,13 @@ function TicketDetail() {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => setAssignees(res.data))
+      .catch(() => {});
+    // Step 32: load reply templates
+    axios
+      .get('http://localhost:5000/api/reply-templates', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => setTemplates(res.data))
       .catch(() => {});
   }, [token, isDispatcherOrAdmin]);
 
@@ -282,6 +295,35 @@ function TicketDetail() {
     return value ?? '—';
   };
 
+  // Step 32: save reply template
+  const handleSaveTemplate = async () => {
+    if (!templateTitle.trim() || !newNote.trim()) return;
+    try {
+      const res = await axios.post(
+        'http://localhost:5000/api/reply-templates',
+        { title: templateTitle.trim(), body: newNote.trim(), is_shared: templateShared },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTemplates((prev) => [...prev, res.data]);
+      setShowSaveForm(false);
+      setTemplateTitle('');
+      setTemplateShared(false);
+    } catch {
+      setError('Failed to save template');
+    }
+  };
+
+  const handleDeleteTemplate = async (id) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/reply-templates/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+    } catch {
+      setError('Failed to delete template');
+    }
+  };
+
   const backUrl = isDispatcherOrAdmin ? '/dispatcher' : '/dashboard';
 
   const inputClass = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-white';
@@ -371,7 +413,13 @@ function TicketDetail() {
                 Submitted on {new Date(ticket.created_at).toLocaleDateString()} at {new Date(ticket.created_at).toLocaleTimeString()}
               </p>
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2 shrink-0">
+              {/* Step 29: overdue badge for dispatchers/admins */}
+              {isDispatcherOrAdmin && ticket.is_overdue && (
+                <span className="text-xs font-medium px-3 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                  Overdue
+                </span>
+              )}
               <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusColor(ticket.status)}`}>
                 {statusLabel(ticket.status)}
               </span>
@@ -621,12 +669,101 @@ function TicketDetail() {
                     )}
                   </span>
                 </label>
+
+                {/* Step 32: Use template dropdown */}
+                {templates.length > 0 && (
+                  <div className="relative mb-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplates((v) => !v)}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                    >
+                      📋 Use template {showTemplates ? '▲' : '▼'}
+                    </button>
+                    {showTemplates && (
+                      <div className="absolute z-20 top-6 left-0 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden">
+                        {templates.map((tpl) => (
+                          <div
+                            key={tpl.id}
+                            className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                            onClick={() => { setNewNote(tpl.body); setShowTemplates(false); }}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-800 dark:text-white truncate">{tpl.title}</p>
+                              {tpl.is_shared && (
+                                <span className="text-xs text-gray-400 dark:text-gray-500">Shared · {tpl.created_by_name}</span>
+                              )}
+                            </div>
+                            {tpl.created_by === user?.id && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(tpl.id); }}
+                                className="text-xs text-red-400 hover:text-red-600 shrink-0"
+                                title="Delete template"
+                              >✕</button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <textarea
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
-                  className={`${inputClass} h-24 resize-none mb-3`}
+                  className={`${inputClass} h-24 resize-none mb-2`}
                   placeholder={isInternal ? 'Internal note (not visible to student)…' : 'Add a note, update, or comment...'}
                 />
+
+                {/* Step 32: Save as template */}
+                {newNote.trim() && !showSaveForm && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveForm(true)}
+                    className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline mb-3 block"
+                  >
+                    Save as template
+                  </button>
+                )}
+                {showSaveForm && (
+                  <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <input
+                      type="text"
+                      value={templateTitle}
+                      onChange={(e) => setTemplateTitle(e.target.value)}
+                      placeholder="Template title…"
+                      className={`${inputClass} mb-2`}
+                    />
+                    <label className="flex items-center gap-2 mb-2 cursor-pointer text-sm text-gray-600 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={templateShared}
+                        onChange={(e) => setTemplateShared(e.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600"
+                      />
+                      Share with all dispatchers
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveTemplate}
+                        disabled={!templateTitle.trim()}
+                        className="text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-3 py-1 rounded-lg transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowSaveForm(false); setTemplateTitle(''); setTemplateShared(false); }}
+                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"

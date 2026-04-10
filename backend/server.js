@@ -10,6 +10,20 @@ const pool = require('./config/db');
 pool.query('ALTER TABLE tickets ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating >= 1 AND rating <= 5)')
   .catch((err) => console.error('Migration error (rating):', err));
 
+pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS available BOOLEAN NOT NULL DEFAULT true')
+  .catch((err) => console.error('Migration error (available):', err));
+
+pool.query(`
+  CREATE TABLE IF NOT EXISTS reply_templates (
+    id          SERIAL PRIMARY KEY,
+    created_by  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    title       VARCHAR(255) NOT NULL,
+    body        TEXT NOT NULL,
+    is_shared   BOOLEAN NOT NULL DEFAULT false,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )
+`).catch((err) => console.error('Migration error (reply_templates):', err));
+
 const authRoutes = require('./routes/auth');
 const ticketRoutes = require('./routes/tickets');
 const adminRoutes = require('./routes/admin');
@@ -17,6 +31,7 @@ const noteRoutes = require('./routes/notes');
 const buildingRoutes = require('./routes/buildings');
 const userRoutes = require('./routes/users');
 const uploadRoutes = require('./routes/uploads');
+const replyTemplateRoutes = require('./routes/replyTemplates');
 
 const app = express();
 const server = http.createServer(app);
@@ -42,6 +57,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/buildings', buildingRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/reply-templates', replyTemplateRoutes);
 
 // Serve uploaded photos statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

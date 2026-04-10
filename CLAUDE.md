@@ -70,10 +70,11 @@ EMAIL_PASS=gmail app password
 - Admin: admin@test.com / password123
 
 ## Database tables
-- **users** — id, name, email, password (hashed), role, reset_token, reset_token_expiry, profile_complete (bool default false), preferred_name, student_id, building, room_number, phone
-- **tickets** — id, title, description, category, priority, status, created_by (FK users), assigned_to (FK users), created_at, updated_at
+- **users** — id, name, email, password (hashed), role, reset_token, reset_token_expiry, profile_complete (bool default false), preferred_name, student_id, building, room_number, phone, available (bool default true)
+- **tickets** — id, title, description, category, priority, status, created_by (FK users), assigned_to (FK users), created_at, updated_at, photo_filename, rating
 - **notes** — id, ticket_id, user_id, content, internal (bool default false), created_at, updated_at
 - **ticket_history** — id, ticket_id, changed_by, field, old_value, new_value, changed_at
+- **reply_templates** — id, created_by (FK users), title, body, is_shared (bool), created_at
 
 ### Enum values
 - category: maintenance, campus_safety, it, cleaning, other
@@ -111,6 +112,12 @@ DELETE /api/admin/users/:id       — delete user (verifyAdmin)
 GET    /api/buildings             — hardcoded sorted list of campus building names (public)
 
 PATCH  /api/users/profile         — update preferred_name, student_id, building, room_number, phone; sets profile_complete=true (verifyToken)
+GET    /api/users/availability    — get current user's available boolean (verifyToken)
+PATCH  /api/users/availability    — set available: true/false (verifyToken)
+
+GET    /api/reply-templates       — own + shared templates with created_by_name (verifyDispatcher)
+POST   /api/reply-templates       — create template { title, body, is_shared } (verifyDispatcher)
+DELETE /api/reply-templates/:id   — delete own template; admin can delete any (verifyDispatcher)
 ```
 
 ## Key patterns & conventions
@@ -222,3 +229,10 @@ PATCH  /api/users/profile         — update preferred_name, student_id, buildin
   - Step 25: CATEGORY_SLA constant added at top of TicketDetail.jsx mapping DB category values to plain-language response time strings; shown as muted helper text below the status/priority badges on the student ticket detail view only
   - Step 26: GET /api/tickets/check-duplicate endpoint added to backend (before /:id route) — accepts category + building query params, checks if the student has an open/in_progress ticket with matching category whose description contains the building name; Step4 in TicketWizard.jsx calls this on mount, disables submit while checking ("Checking…"), and if duplicate found shows a yellow warning card with "Yes, submit anyway" / "Go back" buttons; submitting is not blocked, only warned
   - Step 27: ALTER TABLE tickets ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating >= 1 AND rating <= 5) runs automatically on server startup (server.js); PATCH /api/tickets/:id/rate endpoint added — validates 1–5, checks ownership, requires resolved status; MyTickets.jsx on load finds the first resolved unrated un-dismissed ticket and shows a bottom sheet rating modal with 5 ★ buttons ("How did we do?") — tapping a star calls the rate endpoint and updates local state; "Skip" stores the ticket ID in localStorage ratingDismissed array; only prompts once per ticket
+- Phase 7 dispatcher portal triage & speed — Steps 28–33 complete:
+  - Step 28: Triage strip added above the dispatcher ticket table; SLA_HOURS constant defines numeric hour thresholds per category (campus_safety: 0.5h, maintenance: 24h, it/cleaning/other: 48h); buildTriageCards() computes up to one card per active (open/in_progress) ticket that is Emergency (campus_safety category), Overdue (age > SLA threshold), or Unassigned (open + no assignee); cards sorted Emergency > Overdue > Unassigned then oldest-first within tier; horizontally scrollable row with color-coded cards (red = Emergency, orange = Overdue, yellow = Unassigned); each card shows category emoji icon, ticket #, submitter name, and label badge; clicking navigates to /ticket?id=...; strip hidden entirely when no cards qualify
+  - Step 29: is_overdue boolean added to GET /api/tickets and GET /api/tickets/:id responses; computed in backend (tickets.js) using SLA_HOURS thresholds per category; active tickets (open/in_progress) past their SLA get is_overdue: true; small red "Overdue" badge shown next to ticket # in dispatcher table rows (both desktop and mobile) and next to status/priority badges at the top of TicketDetail.jsx for dispatcher/admin only
+  - Step 30: Quick-action buttons added to each desktop dispatcher table row; row gets Tailwind `group` class; on hover three icon buttons appear (opacity-0 → opacity-100): assign-to-self (person SVG), mark in-progress (play SVG), mark resolved (checkmark SVG); each calls PUT /api/tickets/:id preserving existing priority and other fields; socket.io ticket_updated event updates row in place; button icon turns green for 1.5s on success via rowSuccesses state; assign button title says "Reassign to me" if ticket already has a different assignee; resolved/closed tickets disable the resolved button, in_progress tickets disable the progress button
+  - Step 31: "My queue" toggle added to dispatcher filter bar; filters table to tickets assigned to current user; count shown in label ("My queue (4)"); state persisted in localStorage keyed by user.id; clearFilters() also resets myQueueOnly to false
+  - Step 32: Reply template system added; reply_templates table created (id, created_by, title, body, is_shared, created_at) via auto-migration in server.js; GET/POST/DELETE /api/reply-templates endpoints in new backend/routes/replyTemplates.js; in TicketDetail.jsx dispatcher/admin note form: "📋 Use template" dropdown above textarea (lists own + shared templates, click to insert body, ✕ to delete own); "Save as template" link appears below textarea when note has content; inline save form shows title input + "Share with all dispatchers" checkbox + Save/Cancel; shared templates show creator name
+  - Step 33: On-duty/off-duty availability toggle added; ALTER TABLE users ADD COLUMN IF NOT EXISTS available BOOLEAN NOT NULL DEFAULT true migration runs at startup; GET /api/users/availability and PATCH /api/users/availability endpoints added to routes/users.js; Dispatcher.jsx navbar shows pill toggle (green "On duty" / gray "Off duty") fetched on load; toggle calls PATCH optimistically with revert on error; GET /api/tickets/assignees now only returns dispatchers where available = true (admins always included), so off-duty dispatchers are hidden from all assign dropdowns throughout the app; Admin.jsx Step 38 availability dot deferred to that step

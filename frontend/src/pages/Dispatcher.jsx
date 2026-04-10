@@ -4,6 +4,54 @@ import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
+// SLA thresholds in hours per category
+const SLA_HOURS = {
+  campus_safety: 0.5,
+  maintenance: 24,
+  it: 48,
+  cleaning: 48,
+  other: 48,
+};
+
+const CATEGORY_ICON = {
+  campus_safety: '🚨',
+  maintenance: '🔧',
+  it: '💻',
+  cleaning: '🧹',
+  other: '📋',
+};
+
+// Build triage cards from the full ticket list.
+// Each ticket appears at most once; priority: Emergency > Overdue > Unassigned.
+function buildTriageCards(tickets) {
+  const cards = [];
+  for (const t of tickets) {
+    const isActive = t.status === 'open' || t.status === 'in_progress';
+    if (!isActive) continue;
+
+    const ageHours = (Date.now() - new Date(t.created_at).getTime()) / 3600000;
+    const sla = SLA_HOURS[t.category] ?? 48;
+    const isOverdue = ageHours > sla;
+    const isEmergency = t.category === 'campus_safety';
+    const isUnassigned = t.status === 'open' && !t.assigned_to;
+
+    if (!isEmergency && !isOverdue && !isUnassigned) continue;
+
+    let label;
+    if (isEmergency) label = 'Emergency';
+    else if (isOverdue) label = `Overdue — ${Math.round(ageHours)}h`;
+    else label = 'Unassigned';
+
+    cards.push({ ticket: t, label, priority: isEmergency ? 3 : isOverdue ? 2 : 1 });
+  }
+  // Sort: Emergency first, then Overdue, then Unassigned; within same priority oldest first
+  cards.sort((a, b) => {
+    if (b.priority !== a.priority) return b.priority - a.priority;
+    return new Date(a.ticket.created_at) - new Date(b.ticket.created_at);
+  });
+  return cards;
+}
+
 function Dispatcher() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +73,18 @@ function Dispatcher() {
   const [bulkStatusVal, setBulkStatusVal] = useState('');
   const [bulkAssigneeVal, setBulkAssigneeVal] = useState('');
 
+  // Step 30: quick-action success flash state { [ticketId]: 'assign'|'progress'|'resolved' }
+  const [rowSuccesses, setRowSuccesses] = useState({});
+
+  // Step 31: my-queue toggle (persisted per user)
   const { user, token, logout } = useAuth();
+  const [myQueueOnly, setMyQueueOnly] = useState(() =>
+    localStorage.getItem(`myQueue_${user?.id}`) === 'true'
+  );
+
+  // Step 33: dispatcher availability
+  const [available, setAvailable] = useState(null); // null = loading
+
   const PAGE_SIZE = 20;
   const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 };
 
@@ -57,6 +116,7 @@ function Dispatcher() {
       if (filterAssignee === 'unassigned') return !t.assigned_to;
       return String(t.assigned_to) === filterAssignee;
     })
+    .filter((t) => !myQueueOnly || String(t.assigned_to) === String(user?.id))
     .sort((a, b) => {
       if (sortBy === 'date_desc') return new Date(b.created_at) - new Date(a.created_at);
       if (sortBy === 'date_asc') return new Date(a.created_at) - new Date(b.created_at);
@@ -78,12 +138,14 @@ function Dispatcher() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [ticketsRes, assigneesRes] = await Promise.all([
+        const [ticketsRes, assigneesRes, availRes] = await Promise.all([
           axios.get('http://localhost:5000/api/tickets', { headers: { Authorization: `Bearer ${token}` } }),
           axios.get('http://localhost:5000/api/tickets/assignees', { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get('http://localhost:5000/api/users/availability', { headers: { Authorization: `Bearer ${token}` } }),
         ]);
         setTickets(ticketsRes.data);
         setAssignees(assigneesRes.data);
+        setAvailable(availRes.data.available);
       } catch {
         setError('Failed to load tickets');
       } finally {
@@ -110,6 +172,42 @@ function Dispatcher() {
       );
     } catch {
       setError('Failed to update ticket');
+    }
+  };
+
+  // Step 30: quick-action row buttons
+  const flashSuccess = (ticketId, action) => {
+    setRowSuccesses((prev) => ({ ...prev, [ticketId]: action }));
+    setTimeout(() => setRowSuccesses((prev) => { const n = { ...prev }; delete n[ticketId]; return n; }), 1500);
+  };
+
+  const handleQuickAction = async (ticketId, action) => {
+    const ticket = tickets.find((t) => t.id === ticketId);
+    if (!ticket) return;
+    let body;
+    if (action === 'assign')   body = { status: ticket.status,      priority: ticket.priority, assigned_to: user.id };
+    if (action === 'progress') body = { status: 'in_progress',       priority: ticket.priority, assigned_to: ticket.assigned_to };
+    if (action === 'resolved') body = { status: 'resolved',          priority: ticket.priority, assigned_to: ticket.assigned_to };
+    try {
+      await axios.put(`http://localhost:5000/api/tickets/${ticketId}`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      flashSuccess(ticketId, action);
+    } catch {
+      setError('Quick action failed');
+    }
+  };
+
+  // Step 33: availability toggle
+  const handleToggleAvailability = async () => {
+    const next = !available;
+    setAvailable(next);
+    try {
+      await axios.patch('http://localhost:5000/api/users/availability', { available: next }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      setAvailable(!next); // revert on error
     }
   };
 
@@ -210,6 +308,8 @@ function Dispatcher() {
     setFilterPriority('all');
     setFilterCategory('all');
     setFilterAssignee('all');
+    setMyQueueOnly(false);
+    localStorage.setItem(`myQueue_${user?.id}`, 'false');
     setPage(1);
   };
 
@@ -237,6 +337,20 @@ function Dispatcher() {
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
       <Navbar>
         <span className="text-sm text-gray-600 dark:text-gray-300">Welcome, {user?.name}</span>
+        {/* Step 33: on-duty / off-duty pill */}
+        {available !== null && (
+          <button
+            onClick={handleToggleAvailability}
+            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full font-medium transition-colors ${
+              available
+                ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/60'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full shrink-0 ${available ? 'bg-green-500' : 'bg-gray-400'}`} />
+            {available ? 'On duty' : 'Off duty'}
+          </button>
+        )}
         {user?.role === 'admin' && (
           <button
             onClick={() => window.location.href = '/admin'}
@@ -334,6 +448,49 @@ function Dispatcher() {
           </div>
         )}
 
+        {/* Triage strip */}
+        {!loading && (() => {
+          const triageCards = buildTriageCards(tickets);
+          if (triageCards.length === 0) return null;
+          return (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-2">
+                Needs attention ({triageCards.length})
+              </p>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                {triageCards.map(({ ticket: t, label }) => (
+                  <button
+                    key={t.id}
+                    onClick={() => (window.location.href = `/ticket?id=${t.id}`)}
+                    className={`flex-shrink-0 flex flex-col gap-1 px-4 py-3 rounded-xl shadow-sm border text-left transition-all hover:shadow-md min-w-[160px] max-w-[200px] ${
+                      label === 'Emergency'
+                        ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700'
+                        : label.startsWith('Overdue')
+                        ? 'bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-700'
+                        : 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base leading-none">{CATEGORY_ICON[t.category] ?? '📋'}</span>
+                      <span className="text-xs font-mono text-gray-500 dark:text-gray-400">#{t.id}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">{t.submitted_by_name}</p>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full self-start ${
+                      label === 'Emergency'
+                        ? 'bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200'
+                        : label.startsWith('Overdue')
+                        ? 'bg-orange-100 dark:bg-orange-800 text-orange-700 dark:text-orange-200'
+                        : 'bg-yellow-100 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-200'
+                    }`}>
+                      {label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Filter bar */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-center">
           <input
@@ -392,6 +549,22 @@ function Dispatcher() {
               ))}
             </select>
           </div>
+
+          {/* Step 31: My queue toggle */}
+          <button
+            onClick={() => {
+              const next = !myQueueOnly;
+              setMyQueueOnly(next);
+              localStorage.setItem(`myQueue_${user?.id}`, String(next));
+            }}
+            className={`text-sm px-3 py-2 rounded-lg font-medium transition-colors shrink-0 ${
+              myQueueOnly
+                ? 'bg-blue-600 text-white'
+                : 'border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+            }`}
+          >
+            My queue ({tickets.filter((t) => String(t.assigned_to) === String(user?.id)).length})
+          </button>
 
           <button
             onClick={clearFilters}
@@ -498,7 +671,12 @@ function Dispatcher() {
                       className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">#{ticket.id}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">#{ticket.id}</span>
+                        {ticket.is_overdue && (
+                          <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Overdue</span>
+                        )}
+                      </div>
                       <h3 className="font-semibold text-gray-800 dark:text-white text-sm mt-0.5 truncate">{ticket.title}</h3>
                     </div>
                     <div onClick={(e) => e.stopPropagation()} className="ml-1 shrink-0">
@@ -563,13 +741,14 @@ function Dispatcher() {
                       Priority{sortIndicator('priority')}
                     </th>
                     <th className={thPlain}>Status</th>
+                    <th className="w-28" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                   {paginated.map((ticket) => (
                     <tr
                       key={ticket.id}
-                      className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${selectedIds.has(ticket.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                      className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${selectedIds.has(ticket.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
                       onClick={() => window.location.href = `/ticket?id=${ticket.id}`}
                     >
                       <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
@@ -581,7 +760,12 @@ function Dispatcher() {
                         />
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">#{ticket.id}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">#{ticket.id}</span>
+                          {ticket.is_overdue && (
+                            <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Overdue</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium text-gray-800 dark:text-white truncate max-w-xs">{ticket.title}</p>
@@ -620,6 +804,43 @@ function Dispatcher() {
                           <option value="resolved">Resolved</option>
                           <option value="closed">Closed</option>
                         </select>
+                      </td>
+                      {/* Step 30: quick-action buttons (reveal on row hover) */}
+                      <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Assign to self */}
+                          <button
+                            onClick={() => handleQuickAction(ticket.id, 'assign')}
+                            title={ticket.assigned_to && String(ticket.assigned_to) !== String(user?.id) ? 'Reassign to me' : 'Assign to me'}
+                            className={`p-1.5 rounded-lg transition-colors ${rowSuccesses[ticket.id] === 'assign' ? 'text-green-600 bg-green-50 dark:bg-green-900/30' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          {/* Mark in progress */}
+                          <button
+                            onClick={() => handleQuickAction(ticket.id, 'progress')}
+                            title="Mark in progress"
+                            disabled={ticket.status === 'in_progress'}
+                            className={`p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${rowSuccesses[ticket.id] === 'progress' ? 'text-green-600 bg-green-50 dark:bg-green-900/30' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20'}`}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          {/* Mark resolved */}
+                          <button
+                            onClick={() => handleQuickAction(ticket.id, 'resolved')}
+                            title="Mark resolved"
+                            disabled={ticket.status === 'resolved' || ticket.status === 'closed'}
+                            className={`p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${rowSuccesses[ticket.id] === 'resolved' ? 'text-green-600 bg-green-50 dark:bg-green-900/30' : 'text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'}`}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
