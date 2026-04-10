@@ -4,18 +4,28 @@ const pool = require('../config/db');
 const { verifyToken, verifyDispatcher } = require('../middleware/auth');
 const { sendTicketNotification, sendStatusUpdateEmail } = require('../utils/email');
 const { validateCreateTicket, validateUpdateTicket } = require('../middleware/validate');
+const { getSettings } = require('../utils/settingsCache');
 
-const SLA_HOURS = {
-  campus_safety: 0.5,
-  maintenance: 24,
-  it: 48,
-  cleaning: 48,
-  other: 48,
-};
+const DEFAULT_SLA = { campus_safety: 0.5, maintenance: 24, it: 48, cleaning: 48, other: 48 };
 
-function computeIsOverdue(t) {
+async function getSlaHours() {
+  try {
+    const s = await getSettings();
+    return {
+      campus_safety: parseFloat(s.sla_hours_campus_safety) || DEFAULT_SLA.campus_safety,
+      maintenance:   parseFloat(s.sla_hours_maintenance)   || DEFAULT_SLA.maintenance,
+      it:            parseFloat(s.sla_hours_it)            || DEFAULT_SLA.it,
+      cleaning:      parseFloat(s.sla_hours_cleaning)      || DEFAULT_SLA.cleaning,
+      other:         parseFloat(s.sla_hours_other)         || DEFAULT_SLA.other,
+    };
+  } catch {
+    return DEFAULT_SLA;
+  }
+}
+
+function computeIsOverdue(t, slaHours) {
   if (t.status !== 'open' && t.status !== 'in_progress') return false;
-  const sla = SLA_HOURS[t.category] ?? 48;
+  const sla = slaHours[t.category] ?? 48;
   return (Date.now() - new Date(t.created_at).getTime()) / 3600000 > sla;
 }
 
@@ -34,19 +44,22 @@ router.get('/my-tickets', verifyToken, async (req, res) => {
 });
 
 // Get all tickets with user info - dispatchers and admins only
-router.get('/', verifyDispatcher, async (req, res) => {
+router.get('/', verifyDispatcher, async (_req, res) => {
   try {
-    const tickets = await pool.query(
-      `SELECT tickets.*,
-              submitter.name as submitted_by_name,
-              submitter.email as submitted_by_email,
-              assignee.name as assigned_to_name
-       FROM tickets
-       LEFT JOIN users submitter ON tickets.created_by = submitter.id
-       LEFT JOIN users assignee ON tickets.assigned_to = assignee.id
-       ORDER BY tickets.created_at DESC`
-    );
-    res.json(tickets.rows.map((t) => ({ ...t, is_overdue: computeIsOverdue(t) })));
+    const [tickets, slaHours] = await Promise.all([
+      pool.query(
+        `SELECT tickets.*,
+                submitter.name as submitted_by_name,
+                submitter.email as submitted_by_email,
+                assignee.name as assigned_to_name
+         FROM tickets
+         LEFT JOIN users submitter ON tickets.created_by = submitter.id
+         LEFT JOIN users assignee ON tickets.assigned_to = assignee.id
+         ORDER BY tickets.created_at DESC`
+      ),
+      getSlaHours(),
+    ]);
+    res.json(tickets.rows.map((t) => ({ ...t, is_overdue: computeIsOverdue(t, slaHours) })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -105,7 +118,8 @@ router.get('/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
     const t = ticket.rows[0];
-    res.json({ ...t, is_overdue: computeIsOverdue(t) });
+    const slaHours = await getSlaHours();
+    res.json({ ...t, is_overdue: computeIsOverdue(t, slaHours) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

@@ -4,15 +4,6 @@ import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
-// SLA thresholds in hours per category
-const SLA_HOURS = {
-  campus_safety: 0.5,
-  maintenance: 24,
-  it: 48,
-  cleaning: 48,
-  other: 48,
-};
-
 const CATEGORY_ICON = {
   campus_safety: '🚨',
   maintenance: '🔧',
@@ -23,20 +14,20 @@ const CATEGORY_ICON = {
 
 // Build triage cards from the full ticket list.
 // Each ticket appears at most once; priority: Emergency > Overdue > Unassigned.
+// is_overdue is computed by the backend using DB-configured SLA thresholds.
 function buildTriageCards(tickets) {
   const cards = [];
   for (const t of tickets) {
     const isActive = t.status === 'open' || t.status === 'in_progress';
     if (!isActive) continue;
 
-    const ageHours = (Date.now() - new Date(t.created_at).getTime()) / 3600000;
-    const sla = SLA_HOURS[t.category] ?? 48;
-    const isOverdue = ageHours > sla;
     const isEmergency = t.category === 'campus_safety';
+    const isOverdue = !!t.is_overdue;
     const isUnassigned = t.status === 'open' && !t.assigned_to;
 
     if (!isEmergency && !isOverdue && !isUnassigned) continue;
 
+    const ageHours = (Date.now() - new Date(t.created_at).getTime()) / 3600000;
     let label;
     if (isEmergency) label = 'Emergency';
     else if (isOverdue) label = `Overdue — ${Math.round(ageHours)}h`;
@@ -44,7 +35,6 @@ function buildTriageCards(tickets) {
 
     cards.push({ ticket: t, label, priority: isEmergency ? 3 : isOverdue ? 2 : 1 });
   }
-  // Sort: Emergency first, then Overdue, then Unassigned; within same priority oldest first
   cards.sort((a, b) => {
     if (b.priority !== a.priority) return b.priority - a.priority;
     return new Date(a.ticket.created_at) - new Date(b.ticket.created_at);

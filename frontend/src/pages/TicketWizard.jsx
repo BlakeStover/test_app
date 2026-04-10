@@ -3,15 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import {
-  TEMPLATES,
   CATEGORY_DB_MAP,
   CATEGORY_DEFAULT_TITLE,
   CATEGORY_LABEL,
 } from '../constants/wizardTemplates';
-
-// ── Configurable constants ──────────────────────────────────────────────────
-const CAMPUS_SAFETY_PHONE = '555-123-4567';
-// ───────────────────────────────────────────────────────────────────────────
 
 // ── SVG Icons ───────────────────────────────────────────────────────────────
 function LockIcon() {
@@ -131,14 +126,20 @@ function NextButton({ onClick, disabled, label = 'Next' }) {
 
 // ── Emergency Modal ──────────────────────────────────────────────────────────
 function EmergencyModal({ onClose, token }) {
+  const [phone, setPhone] = useState('');
   const [ticketFired, setTicketFired] = useState(false);
+
+  useEffect(() => {
+    axios.get('http://localhost:5000/api/settings/emergency_phone', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => setPhone(r.data.value))
+      .catch(() => setPhone('555-123-4567')); // fallback
+  }, [token]);
 
   const handleCallNow = () => {
     if (!ticketFired) {
       setTicketFired(true);
-      // Fire-and-forget background ticket
-      // Note: DB category enum uses 'campus_safety'; priority enum uses 'urgent'
-      // (no 'emergency' category or 'critical' priority exist in the DB enums)
       axios
         .post(
           'http://localhost:5000/api/tickets',
@@ -152,7 +153,7 @@ function EmergencyModal({ onClose, token }) {
         )
         .catch(() => {});
     }
-    window.location.href = `tel:${CAMPUS_SAFETY_PHONE}`;
+    if (phone) window.location.href = `tel:${phone}`;
   };
 
   return (
@@ -167,12 +168,13 @@ function EmergencyModal({ onClose, token }) {
       <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Campus Safety</p>
         <p className="text-5xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">
-          {CAMPUS_SAFETY_PHONE}
+          {phone || '…'}
         </p>
         <p className="text-sm text-gray-400 dark:text-gray-500 mb-10">Available 24 / 7</p>
         <button
           onClick={handleCallNow}
-          className="w-full max-w-xs bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold text-lg py-4 rounded-2xl shadow-sm transition-colors mb-4"
+          disabled={!phone}
+          className="w-full max-w-xs bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:opacity-50 text-white font-semibold text-lg py-4 rounded-2xl shadow-sm transition-colors mb-4"
         >
           Call now
         </button>
@@ -222,9 +224,20 @@ function Step1({ onSelect, onEmergency }) {
 }
 
 // ── Step 2: Template Picker ──────────────────────────────────────────────────
-function Step2({ form, setForm, onNext }) {
-  const templates = TEMPLATES[form.category] || [];
+function Step2({ form, setForm, onNext, token }) {
+  const [templates, setTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [customDesc, setCustomDesc] = useState(form.template_id ? '' : form.description);
+
+  useEffect(() => {
+    setLoadingTemplates(true);
+    axios.get(`http://localhost:5000/api/ticket-templates?category=${form.category}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => setTemplates(r.data))
+      .catch(() => setTemplates([]))
+      .finally(() => setLoadingTemplates(false));
+  }, [form.category, token]);
 
   const handleTemplateSelect = (tpl) => {
     setCustomDesc('');
@@ -246,7 +259,11 @@ function Step2({ form, setForm, onNext }) {
 
       {/* Template list */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden mb-5">
-        {templates.map((tpl, i) => {
+        {loadingTemplates ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+          </div>
+        ) : templates.map((tpl, i) => {
           const selected = form.template_id === tpl.id;
           return (
             <button
@@ -689,6 +706,7 @@ function TicketWizard() {
               form={form}
               setForm={setForm}
               onNext={() => setStep(3)}
+              token={token}
             />
           )}
           {step === 3 && (

@@ -75,6 +75,9 @@ EMAIL_PASS=gmail app password
 - **notes** — id, ticket_id, user_id, content, internal (bool default false), created_at, updated_at
 - **ticket_history** — id, ticket_id, changed_by, field, old_value, new_value, changed_at
 - **reply_templates** — id, created_by (FK users), title, body, is_shared (bool), created_at
+- **buildings** — id, name (unique), active (bool default true), created_at
+- **ticket_templates** — id, category (wizard cat), title, subtitle, description, display_order, active (bool default true)
+- **system_settings** — key (varchar PK), value (text), label, updated_at
 
 ### Enum values
 - category: maintenance, campus_safety, it, cleaning, other
@@ -109,7 +112,23 @@ GET    /api/admin/users           — all users (verifyAdmin)
 PUT    /api/admin/users/:id/role  — change role (verifyAdmin)
 DELETE /api/admin/users/:id       — delete user (verifyAdmin)
 
-GET    /api/buildings             — hardcoded sorted list of campus building names (public)
+GET    /api/buildings             — active buildings from DB sorted alphabetically (public)
+
+GET    /api/admin/buildings             — all buildings incl. inactive (verifyAdmin)
+POST   /api/admin/buildings             — create building { name } (verifyAdmin)
+PATCH  /api/admin/buildings/:id         — update { name?, active? } (verifyAdmin)
+DELETE /api/admin/buildings/:id         — soft delete, sets active=false (verifyAdmin)
+
+GET    /api/ticket-templates?category=X — active templates for wizard category, by display_order (public)
+GET    /api/admin/ticket-templates      — all templates incl. inactive (verifyAdmin)
+POST   /api/admin/ticket-templates      — create { category, title, subtitle, description } (verifyAdmin)
+PATCH  /api/admin/ticket-templates/:id  — update any fields incl. active, display_order (verifyAdmin)
+DELETE /api/admin/ticket-templates/:id  — soft delete, sets active=false (verifyAdmin)
+
+GET    /api/settings                    — all settings key/value/label (verifyToken)
+GET    /api/settings/:key               — single setting (verifyToken)
+GET    /api/admin/settings              — all settings (verifyAdmin)
+PATCH  /api/admin/settings/:key         — update value, invalidates 60s cache (verifyAdmin)
 
 PATCH  /api/users/profile         — update preferred_name, student_id, building, room_number, phone; sets profile_complete=true (verifyToken)
 GET    /api/users/availability    — get current user's available boolean (verifyToken)
@@ -236,3 +255,8 @@ DELETE /api/reply-templates/:id   — delete own template; admin can delete any 
   - Step 31: "My queue" toggle added to dispatcher filter bar; filters table to tickets assigned to current user; count shown in label ("My queue (4)"); state persisted in localStorage keyed by user.id; clearFilters() also resets myQueueOnly to false
   - Step 32: Reply template system added; reply_templates table created (id, created_by, title, body, is_shared, created_at) via auto-migration in server.js; GET/POST/DELETE /api/reply-templates endpoints in new backend/routes/replyTemplates.js; in TicketDetail.jsx dispatcher/admin note form: "📋 Use template" dropdown above textarea (lists own + shared templates, click to insert body, ✕ to delete own); "Save as template" link appears below textarea when note has content; inline save form shows title input + "Share with all dispatchers" checkbox + Save/Cancel; shared templates show creator name
   - Step 33: On-duty/off-duty availability toggle added; ALTER TABLE users ADD COLUMN IF NOT EXISTS available BOOLEAN NOT NULL DEFAULT true migration runs at startup; GET /api/users/availability and PATCH /api/users/availability endpoints added to routes/users.js; Dispatcher.jsx navbar shows pill toggle (green "On duty" / gray "Off duty") fetched on load; toggle calls PATCH optimistically with revert on error; GET /api/tickets/assignees now only returns dispatchers where available = true (admins always included), so off-duty dispatchers are hidden from all assign dropdowns throughout the app; Admin.jsx Step 38 availability dot deferred to that step
+- Phase 8 admin panel system configuration — Steps 34–37 complete:
+  - Step 34: Buildings management tab added to admin panel; buildings table created via auto-migration in server.js (id, name UNIQUE, active BOOLEAN DEFAULT true, created_at); seeded on startup with ON CONFLICT DO NOTHING using existing 21 default building names; GET /api/admin/buildings (verifyAdmin, returns all including inactive), POST /api/admin/buildings (create), PATCH /api/admin/buildings/:id (update name and/or active), DELETE /api/admin/buildings/:id (soft delete, sets active=false) endpoints added to admin.js; GET /api/buildings updated to query DB for active=true buildings sorted alphabetically (no longer hardcoded); Admin.jsx refactored into UsersTab + BuildingsTab sub-components with a pill tab bar (Users | Buildings); BuildingsTab: "Add building" form at top, list shows all buildings with inline-edit name input (Enter to save, Escape to cancel), active/inactive pill toggle switch, and Remove button (soft delete with confirm); inactive buildings shown at 50% opacity; success/error flash messages; footer note about re-enabling
+  - Step 35: Ticket templates management tab added to admin panel; ticket_templates table created via auto-migration (id, category, title, subtitle, description, display_order, active); seeded with all 20 templates from the hardcoded wizardTemplates.js constants (4 per wizard category); GET /api/admin/ticket-templates (all including inactive), POST, PATCH /:id, DELETE /:id (soft delete) endpoints added to admin.js; GET /api/ticket-templates?category=X public endpoint added (routes/ticketTemplates.js, mounted at /api/ticket-templates) returning active templates for a wizard category sorted by display_order; Admin.jsx TemplatesTab: accordion layout grouped by wizard category, each row has drag handle (HTML5 draggable), inline edit form (title/subtitle/description), active toggle switch, Remove button; drag-and-drop reorders within a category and PATCHes updated display_orders; "Add template" expander per category; TicketWizard.jsx Step2 now fetches from GET /api/ticket-templates?category=X (with token) on category change instead of using hardcoded TEMPLATES constant; loading spinner while fetching; TEMPLATES import removed from wizardTemplates.js usage
+  - Step 36: System settings tab added to admin panel; system_settings table created via auto-migration (key VARCHAR PRIMARY KEY, value TEXT, label, updated_at); seeded with emergency_phone='555-123-4567' row; GET /api/admin/settings (verifyAdmin), PATCH /api/admin/settings/:key (verifyAdmin, invalidates cache) endpoints added to admin.js; GET /api/settings and GET /api/settings/:key endpoints added (routes/settings.js, verifyToken, mounted at /api/settings); Admin.jsx SettingsTab: non-SLA settings rendered as labeled text inputs with individual Save buttons; TicketWizard.jsx EmergencyModal now fetches emergency_phone from GET /api/settings/emergency_phone on mount (with token) and falls back to '555-123-4567' on error; CAMPUS_SAFETY_PHONE hardcoded constant removed
+  - Step 37: SLA configuration extended into system_settings; 5 rows seeded: sla_hours_campus_safety=0.5, sla_hours_maintenance=24, sla_hours_it=48, sla_hours_cleaning=48, sla_hours_other=48; backend/utils/settingsCache.js created — getSettings() fetches all settings from DB with 60s in-memory TTL, invalidateCache() resets it (called on every PATCH /api/admin/settings/:key); tickets.js now uses getSlaHours() (reads from cache) and passes slaHours to computeIsOverdue() instead of hardcoded SLA_HOURS constant; Admin.jsx SettingsTab "Response time targets" section groups SLA keys with numeric hour inputs and per-row Save buttons; Dispatcher.jsx buildTriageCards updated to use t.is_overdue from backend instead of recomputing with client-side SLA_HOURS (constant removed); TicketDetail.jsx CATEGORY_SLA hardcoded constant replaced with slaHoursToText() helper; fetches all settings on mount via GET /api/settings and derives student-facing SLA copy dynamically using sla_hours_{category} key

@@ -5,13 +5,15 @@ import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import { STUDENT_STATUS_LABELS } from '../constants/wizardTemplates';
 
-const CATEGORY_SLA = {
-  campus_safety: 'Usually responded to within 30 minutes',
-  maintenance:   'Usually responded to within 24 hours',
-  it:            'Usually responded to within 2 business days',
-  cleaning:      'Usually responded to within 48 hours',
-  other:         'Usually responded to within 2 business days',
-};
+function slaHoursToText(hours) {
+  const h = parseFloat(hours);
+  if (!h) return null;
+  if (h < 1) return `Usually responded to within ${Math.round(h * 60)} minutes`;
+  if (h === 1) return 'Usually responded to within 1 hour';
+  if (h <= 24) return `Usually responded to within ${h} hour${h === 1 ? '' : 's'}`;
+  const days = Math.round(h / 24);
+  return `Usually responded to within ${days} business day${days === 1 ? '' : 's'}`;
+}
 
 function TicketDetail() {
   const [ticket, setTicket] = useState(null);
@@ -29,6 +31,7 @@ function TicketDetail() {
   const [photoOpen, setPhotoOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [slaText, setSlaText] = useState('');
   // Step 32: reply templates
   const [templates, setTemplates] = useState([]);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -76,8 +79,21 @@ function TicketDetail() {
       }
     };
 
+    const getSlaSetting = async () => {
+      try {
+        const res = await axios.get('http://localhost:5000/api/settings', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const map = Object.fromEntries(res.data.map((s) => [s.key, s.value]));
+        // Build per-DB-category SLA text; resolved after ticket loads so we capture category below
+        setSlaText(map);
+      } catch {
+        // non-critical
+      }
+    };
+
     if (ticketId) {
-      Promise.all([getTicket(), getNotes(), getHistory()]).finally(() => setLoading(false));
+      Promise.all([getTicket(), getNotes(), getHistory(), getSlaSetting()]).finally(() => setLoading(false));
     }
   }, [ticketId, token]);
 
@@ -429,9 +445,9 @@ function TicketDetail() {
             </div>
           </div>
 
-          {isStudent && CATEGORY_SLA[ticket.category] && (
+          {isStudent && slaText && slaText[`sla_hours_${ticket.category}`] && (
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
-              {CATEGORY_SLA[ticket.category]}
+              {slaHoursToText(slaText[`sla_hours_${ticket.category}`])}
             </p>
           )}
 
